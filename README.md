@@ -2,6 +2,8 @@
 
 A local-first AI orchestrator for managing multiple Claude Code agents. One entry point, ambient awareness, automatic context management.
 
+![Sutra orchestrator timeline view — DAW-style lanes with one block per Claude session](docs/timeline.png)
+
 ## What it does
 
 You talk to **Sutra** — one orchestrator. Sutra dispatches work to sandboxed Claude Code agents, monitors their progress in real time on a DAW-style timeline, and manages their context windows automatically. Each Claude session shows up as a block on the timeline; when context gets too full, Sutra spoofs the session (compresses history into a fresh start) and the new block opens with a visible seam linking it to its parent.
@@ -33,7 +35,7 @@ Open http://localhost:8900
 You'll need:
 - Python 3.8+
 - Claude Code CLI installed and authenticated (`claude auth login`)
-- (Optional) [Continuum](https://github.com/your-org/continuum) for session compression on auto-reset
+- (Optional) [Continuum](https://github.com/symbolic01/continuum) for session compression on auto-reset
 
 ## Architecture
 
@@ -95,6 +97,11 @@ A few principles that shape the codebase:
 Early open-source release. The orchestration loop, session timeline, reset visibility, and DAW-style block view all work. Several modules in `server/` are scaffolded but not yet wired (router, rate_limiter, schema, session_writer, adapters/*, voice/*) — see the comments in those files.
 
 Expect rough edges. PRs and issues welcome.
+
+## Credits
+
+- **[Continuum](https://github.com/symbolic01/continuum)** by [Jaya Marks](https://github.com/symbolic01) — the session-compression engine behind Sutra's auto-reset / spoof feature. Without Continuum, hitting the context wall means losing the conversation; with it, the session is distilled to its essential thread and resumed.
+- Built on top of [Claude Code](https://github.com/anthropics/claude-code) by Anthropic.
 
 ## License
 
