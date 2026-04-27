@@ -1,0 +1,10 @@
+{
+  "name": "Sutra",
+  "short_name": "sutra",
+  "description": "AI orchestrator for personal OS",
+  "start_url": "/mobile.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": []
+}

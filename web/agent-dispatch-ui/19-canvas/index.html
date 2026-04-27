@@ -1,0 +1,2492 @@
+<!doctype html>
+<!--
+  19-canvas — the canvas IS the app. Iteration of 18-constellation that
+  strips every panel, sidebar, and toolbar. One slim glass top bar, one
+  full-bleed HTML5 canvas with pinch/zoom/pan. A command strip only
+  slides up when something is selected.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Canvas — Agent Dispatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #04050a;
+    --bg-1: #07090f;
+    --bg-2: #0d101a;
+    --ink-0: #e7e9f2;
+    --ink-1: #b8bccf;
+    --ink-2: #6a6f85;
+    --ink-3: #353849;
+    --line: #181b25;
+    --line-2: #23273433;
+    --accent: #f5b73d;
+    --accent-soft: rgba(245,183,61,0.14);
+    --accent-glow: rgba(245,183,61,0.55);
+    --danger: #ef5a5a;
+    --ok: #6fe1b1;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-0);
+    color: var(--ink-0);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 400;
+    overflow: hidden;
+    height: 100vh; width: 100vw;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Stage: dark base + faint radial wash */
+  .stage {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 20%, rgba(30,40,80,0.08), transparent 60%),
+      radial-gradient(ellipse at 85% 80%, rgba(20,30,60,0.06), transparent 60%),
+      radial-gradient(ellipse at 50% 50%, rgba(10,12,22,0.7), transparent 75%),
+      var(--bg-0);
+    z-index: 0;
+  }
+
+  /* Fixed CSS star field behind canvas */
+  .stars {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  /* Main canvas — full viewport */
+  #world {
+    position: fixed; inset: 0;
+    z-index: 2;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+  #world.grabbing { cursor: grabbing; }
+
+  /* Slim top bar */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 40px;
+    display: flex; align-items: center;
+    padding: 0 14px;
+    background: rgba(4,5,10,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    z-index: 30;
+    font-size: 11px;
+  }
+  .base-nav {
+    display: flex; align-items: center; gap: 6px;
+    margin: 0 auto;
+  }
+  .base-pip {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    color: rgba(255,255,255,0.3);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .base-pip .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    opacity: 0.4;
+    transition: opacity 0.2s, box-shadow 0.2s;
+  }
+  .base-pip.active {
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+  }
+  .base-pip.active .dot {
+    opacity: 1;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--ink-0);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    animation: pulseDot 2.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 0.6; box-shadow: 0 0 4px var(--accent-glow); }
+    50% { opacity: 1; box-shadow: 0 0 12px var(--accent-glow); }
+  }
+
+  /* Node kind legend pill (bottom-left) */
+  .kind-legend {
+    position: fixed; bottom: 14px; left: 14px;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(4,5,10,0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 9px;
+    color: var(--ink-2);
+    letter-spacing: 0.08em;
+    z-index: 20;
+    transition: bottom 0.4s cubic-bezier(0.22,0.61,0.36,1);
+  }
+  .kind-legend.strip-open { bottom: 100px; }
+  .kind-item { display: flex; align-items: center; gap: 5px; }
+  .kind-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  .right-cluster {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .alert-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--accent);
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid rgba(245,183,61,0.35);
+    border-radius: 4px;
+    background: rgba(245,183,61,0.06);
+    animation: alertGlow 2.4s ease-in-out infinite;
+    cursor: pointer;
+  }
+  @keyframes alertGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(245,183,61,0); }
+    50% { box-shadow: 0 0 10px rgba(245,183,61,0.35); }
+  }
+  .alert-badge .bolt { font-size: 10px; }
+
+  .mini-bars {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .mini-bar {
+    position: relative;
+    width: 20px; height: 4px;
+    background: #1a1d27;
+    border-radius: 1px;
+    overflow: visible;
+    cursor: help;
+  }
+  .mini-bar .fill {
+    position: absolute; inset: 0;
+    width: 50%;
+    background: var(--ink-1);
+    border-radius: 1px;
+    transition: width 0.6s ease;
+  }
+  .mini-bar.warn .fill { background: var(--accent); box-shadow: 0 0 4px var(--accent-glow); }
+  .mini-bar.crit .fill { background: var(--danger); }
+
+  /* tooltip on mini-bars */
+  .mini-bar .tip {
+    position: absolute;
+    top: calc(100% + 8px); right: 0;
+    background: rgba(9,11,18,0.98);
+    border: 1px solid var(--line);
+    padding: 5px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 10px;
+    color: var(--ink-1);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 40;
+  }
+  .mini-bar:hover .tip { opacity: 1; transform: translateY(0); }
+  .mini-bar .tip strong { color: var(--ink-0); font-weight: 500; }
+
+  /* Agent tooltip near a clicked agent dot */
+  .agent-tip {
+    position: fixed;
+    background: rgba(9,11,18,0.98);
+    border: 1px solid var(--line);
+    padding: 5px 9px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--ink-1);
+    pointer-events: none;
+    z-index: 25;
+    transform: translate(-50%, -120%);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .agent-tip.show { opacity: 1; }
+  .agent-tip strong { color: var(--ink-0); font-weight: 500; }
+  .agent-tip .label {
+    color: var(--ink-2); font-size: 9px;
+    margin-top: 2px; display: block;
+    letter-spacing: 0.08em;
+  }
+
+  /* Zoom display + buttons */
+  .zoom-meta {
+    position: fixed;
+    bottom: 14px; right: 14px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+    z-index: 20;
+    font-size: 10px;
+    color: var(--ink-2);
+    letter-spacing: 0.06em;
+  }
+  .zoom-meta.strip-open { bottom: 100px; }
+  .zoom-buttons {
+    display: flex; gap: 4px;
+  }
+  .zoom-btn {
+    width: 24px; height: 24px;
+    background: rgba(4,5,10,0.8);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink-1);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .zoom-btn:hover { border-color: var(--ink-3); color: var(--ink-0); }
+  .zoom-label {
+    padding: 2px 8px;
+    background: rgba(4,5,10,0.6);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+
+  /* Command strip — slides up from the bottom when an entity is selected */
+  .cmd-strip {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: rgba(4,5,10,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+    padding: 0 20px;
+    display: flex; align-items: center; gap: 18px;
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+    z-index: 28;
+  }
+  .cmd-strip.open { transform: translateY(0); }
+  .cmd-title {
+    display: flex; flex-direction: column; gap: 4px;
+    min-width: 150px;
+  }
+  .cmd-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-0);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .cmd-type {
+    font-size: 9px;
+    color: var(--ink-2);
+    border: 1px solid var(--ink-3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    align-self: flex-start;
+    letter-spacing: 0.08em;
+  }
+  .cmd-actions {
+    display: flex; gap: 6px;
+  }
+  .cmd-btn {
+    background: rgba(13,16,26,0.9);
+    border: 1px solid var(--line);
+    color: var(--ink-1);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.15s ease;
+  }
+  .cmd-btn:hover {
+    border-color: var(--ink-3);
+    color: var(--ink-0);
+  }
+  .cmd-btn.primary {
+    background: var(--accent);
+    color: #1a1306;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .cmd-btn.primary:hover {
+    background: #ffd672;
+    box-shadow: 0 0 14px var(--accent-glow);
+  }
+
+  .cmd-res {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .cmd-res-item {
+    display: flex; flex-direction: column; gap: 4px;
+    min-width: 80px;
+  }
+  .cmd-res-label {
+    font-size: 9px;
+    color: var(--ink-2);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .cmd-res-value {
+    font-size: 11px;
+    color: var(--ink-1);
+  }
+  .cmd-res-bar {
+    height: 2px; width: 100%;
+    background: #1a1d27;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .cmd-res-bar .fill {
+    height: 100%; width: 50%;
+    background: var(--ink-1);
+    transition: width 0.5s ease;
+  }
+  .cmd-res-bar.warn .fill { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+  .cmd-res-bar.crit .fill { background: var(--danger); }
+
+  /* Agent chat panel — slides in from right when an agent is selected */
+  .chat-panel {
+    position: fixed;
+    top: 0; right: 0;
+    width: 400px;
+    height: 100vh;
+    background: rgba(4,5,10,0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.22,0.61,0.36,1);
+    z-index: 35;
+  }
+  .chat-panel.open { transform: translateX(0); }
+  .chat-head {
+    padding: 48px 18px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .chat-agent-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .chat-avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffe39a, #f5b73d 60%, #8a5a12);
+    box-shadow: 0 0 12px var(--accent-glow);
+    flex-shrink: 0;
+  }
+  .chat-avatar.needs-input {
+    animation: pulseDot 1.6s ease-in-out infinite;
+  }
+  .chat-avatar.working {
+    background: radial-gradient(circle at 35% 35%, #c4ffd9, #6fe1b1 60%, #1e6b4c);
+    box-shadow: 0 0 10px rgba(111,225,177,0.55);
+  }
+  .chat-avatar.primary {
+    background: radial-gradient(circle at 35% 35%, #ffe39a, #f5b73d 60%, #8a5a12);
+    box-shadow: 0 0 14px var(--accent-glow);
+  }
+  .chat-name {
+    font-size: 14px; font-weight: 600;
+    color: var(--ink-0);
+    letter-spacing: 0.08em;
+  }
+  .chat-sub {
+    font-size: 10px; color: var(--ink-2);
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+  .chat-close {
+    margin-left: auto;
+    background: none; border: none;
+    color: var(--ink-2);
+    font-size: 18px; cursor: pointer;
+    font-family: inherit;
+    padding: 0; line-height: 1;
+  }
+  .chat-close:hover { color: var(--ink-0); }
+
+  /* Phase ribbon — plan → execute → review */
+  .phase-ribbon {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 6px;
+  }
+  .phase-pip {
+    flex: 1;
+    height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    background: rgba(13,16,26,0.5);
+    transition: all 0.2s;
+  }
+  .phase-pip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--ink-3);
+  }
+  .phase-pip.done {
+    color: var(--ink-2);
+    border-color: var(--ink-3);
+  }
+  .phase-pip.done .dot { background: var(--ok); box-shadow: 0 0 4px var(--ok); }
+  .phase-pip.active {
+    color: var(--ink-0);
+    border-color: var(--accent);
+    background: rgba(245,183,61,0.08);
+    box-shadow: 0 0 10px rgba(245,183,61,0.15);
+  }
+  .phase-pip.active .dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+    animation: pulseDot 1.6s ease-in-out infinite;
+  }
+
+  /* Activity log */
+  .chat-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .log-entry {
+    display: flex; flex-direction: column;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .log-meta {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
+    margin-bottom: 3px;
+  }
+  .log-meta .phase-tag {
+    color: var(--accent);
+    margin-right: 8px;
+    font-weight: 600;
+  }
+  .log-body {
+    color: var(--ink-1);
+    padding: 8px 10px;
+    background: rgba(13,16,26,0.6);
+    border-left: 2px solid var(--line);
+    border-radius: 0 3px 3px 0;
+  }
+  .log-entry.user .log-meta .phase-tag { color: var(--ok); }
+  .log-entry.user .log-body {
+    border-left-color: var(--ok);
+    background: rgba(111,225,177,0.05);
+  }
+  .log-entry.agent .log-body {
+    border-left-color: var(--accent);
+  }
+  .log-entry.system .log-body {
+    color: var(--ink-2);
+    font-style: italic;
+    border-left-color: var(--ink-3);
+    background: transparent;
+    padding: 4px 10px;
+  }
+  .chat-log::-webkit-scrollbar { width: 6px; }
+  .chat-log::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+  /* Chat input */
+  .chat-input-row {
+    border-top: 1px solid var(--line);
+    padding: 12px 14px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .chat-input {
+    width: 100%;
+    min-height: 52px;
+    background: rgba(13,16,26,0.9);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink-0);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-input::placeholder { color: var(--ink-3); }
+  .chat-actions {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chat-btn {
+    background: rgba(13,16,26,0.9);
+    border: 1px solid var(--line);
+    color: var(--ink-1);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.15s;
+  }
+  .chat-btn:hover { border-color: var(--ink-3); color: var(--ink-0); }
+  .chat-btn.danger { color: #ef8a8a; }
+  .chat-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .chat-send {
+    margin-left: auto;
+    background: var(--accent);
+    color: #1a1306;
+    border: 1px solid var(--accent);
+    font-weight: 600;
+  }
+  .chat-send:hover { background: #ffd672; box-shadow: 0 0 10px var(--accent-glow); }
+
+  /* Dispatch modal — centered, slides down from top */
+  .dispatch-modal {
+    position: fixed;
+    top: 56px; left: 50%;
+    transform: translate(-50%, -20px);
+    width: 520px;
+    background: rgba(4,5,10,0.96);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--ink-3);
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 30px rgba(245,183,61,0.08);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.22,0.61,0.36,1);
+    overflow: hidden;
+  }
+  .dispatch-modal.open {
+    opacity: 1; pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
+  .dispatch-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .dispatch-head .target {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .dispatch-head .close {
+    background: none; border: none;
+    color: var(--ink-2);
+    font-size: 14px; cursor: pointer;
+    font-family: inherit;
+    padding: 0; line-height: 1;
+  }
+  .dispatch-head .close:hover { color: var(--ink-0); }
+
+  .dispatch-body { padding: 14px 16px; }
+  .dispatch-input {
+    width: 100%;
+    min-height: 72px;
+    background: rgba(13,16,26,0.9);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink-0);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .dispatch-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+  .dispatch-input::placeholder { color: var(--ink-3); }
+
+  .dispatch-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--line);
+  }
+  .phase-group {
+    display: flex; align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .phase-group button {
+    background: none; border: none;
+    color: var(--ink-2);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+  }
+  .phase-group button + button { border-left: 1px solid var(--line); }
+  .phase-group button:hover { color: var(--ink-1); }
+  .phase-group button.on {
+    background: var(--ink-1);
+    color: var(--bg-0);
+  }
+  .phase-hint {
+    font-size: 10px;
+    color: var(--ink-3);
+    margin-left: 4px;
+    letter-spacing: 0.04em;
+  }
+  .dispatch-submit {
+    margin-left: auto;
+    background: var(--accent);
+    color: #1a1306;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+  }
+  .dispatch-submit:hover {
+    background: #ffd672;
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .dispatch-submit:disabled {
+    opacity: 0.4; cursor: not-allowed;
+    box-shadow: none;
+  }
+  .dispatch-scrim {
+    position: fixed; inset: 0;
+    background: rgba(4,5,10,0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 49;
+  }
+  .dispatch-scrim.open { opacity: 1; pointer-events: auto; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 52px; left: 50%;
+    transform: translate(-50%, -10px);
+    background: rgba(9,11,18,0.98);
+    border: 1px solid var(--line);
+    color: var(--ink-1);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 40;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast .acc { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="stage"></div>
+<canvas class="stars" id="stars"></canvas>
+<canvas id="world"></canvas>
+
+<div class="top-bar" id="topBar">
+  <div class="brand">
+    <div class="pulse-dot"></div>
+    <span>sutra</span>
+  </div>
+
+  <div class="base-nav" id="baseNav"></div>
+
+  <div class="right-cluster">
+    <div class="alert-badge" id="alertBadge" title="1 blocker: toll-free verify">
+      <span class="bolt">&#9889;</span><span id="alertCount">1</span>
+    </div>
+    <div class="mini-bars">
+      <div class="mini-bar" id="ctxBar">
+        <div class="fill"></div>
+        <div class="tip"><strong>context</strong> <span id="ctxTip">70k / 200k</span></div>
+      </div>
+      <div class="mini-bar warn" id="spendBar">
+        <div class="fill"></div>
+        <div class="tip"><strong>spend</strong> <span id="spendTip">$1.84 today</span></div>
+      </div>
+      <div class="mini-bar" id="memBar">
+        <div class="fill"></div>
+        <div class="tip"><strong>memory</strong> <span id="memTip">54%</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="agent-tip" id="agentTip">
+  <strong id="agentTipName">Kit</strong>
+  <span class="label" id="agentTipLabel">working</span>
+</div>
+
+<div class="zoom-meta" id="zoomMeta">
+  <div class="zoom-buttons">
+    <button class="zoom-btn" id="zoomOut" title="zoom out">&#8722;</button>
+    <button class="zoom-btn" id="zoomIn" title="zoom in">+</button>
+  </div>
+  <div class="zoom-label" id="zoomLabel">100%</div>
+</div>
+
+<div class="cmd-strip" id="cmdStrip">
+  <div class="cmd-title">
+    <div class="cmd-name" id="cmdName">&mdash;</div>
+    <div class="cmd-type" id="cmdType">&mdash;</div>
+  </div>
+  <div class="cmd-actions">
+    <button class="cmd-btn primary" data-cmd="dispatch">Dispatch &#8599;</button>
+    <button class="cmd-btn" data-cmd="brief">Brief</button>
+    <button class="cmd-btn" data-cmd="fresh">Fresh</button>
+  </div>
+  <div class="cmd-res">
+    <div class="cmd-res-item">
+      <div class="cmd-res-label" id="resLabelA">Focus</div>
+      <div class="cmd-res-value" id="resFocus">62%</div>
+      <div class="cmd-res-bar"><div class="fill" id="resFocusFill" style="width:62%"></div></div>
+    </div>
+    <div class="cmd-res-item">
+      <div class="cmd-res-label" id="resLabelB">Task</div>
+      <div class="cmd-res-value" id="resHeat">warm</div>
+      <div class="cmd-res-bar warn"><div class="fill" id="resHeatFill" style="width:74%"></div></div>
+    </div>
+    <div class="cmd-res-item">
+      <div class="cmd-res-label" id="resLabelC">Queue</div>
+      <div class="cmd-res-value" id="resQueue">3 tasks</div>
+      <div class="cmd-res-bar"><div class="fill" id="resQueueFill" style="width:40%"></div></div>
+    </div>
+    <div class="cmd-res-item">
+      <div class="cmd-res-label" id="resLabelD">Updated</div>
+      <div class="cmd-res-value" id="resUpdated">just now</div>
+      <div class="cmd-res-bar"><div class="fill" id="resUpdatedFill" style="width:92%"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="kind-legend" id="kindLegend">
+  <div class="kind-item"><div class="kind-dot" style="background:#7ec8b8"></div>code</div>
+  <div class="kind-item"><div class="kind-dot" style="background:#c8b87e"></div>doc</div>
+  <div class="kind-item"><div class="kind-dot" style="background:#f5b73d"></div>decision</div>
+  <div class="kind-item"><div class="kind-dot" style="background:#7a7e9a"></div>note</div>
+</div>
+
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <div class="chat-agent-row">
+      <div class="chat-avatar" id="chatAvatar"></div>
+      <div style="flex:1; min-width:0;">
+        <div class="chat-name" id="chatName">—</div>
+        <div class="chat-sub" id="chatSub">—</div>
+      </div>
+      <button class="chat-close" id="chatClose" title="Close">&times;</button>
+    </div>
+    <div class="phase-ribbon">
+      <div class="phase-pip" data-phase="plan"><span class="dot"></span>PLAN</div>
+      <div class="phase-pip" data-phase="execute"><span class="dot"></span>EXECUTE</div>
+      <div class="phase-pip" data-phase="review"><span class="dot"></span>REVIEW</div>
+    </div>
+  </div>
+  <div class="chat-log" id="chatLog"></div>
+  <div class="chat-input-row">
+    <textarea class="chat-input" id="chatInput" placeholder="Talk to this agent. Redirect, clarify, or hand it new context."></textarea>
+    <div class="chat-actions">
+      <button class="chat-btn danger" id="chatInterrupt">INTERRUPT</button>
+      <button class="chat-btn" id="chatFresh">FRESH</button>
+      <button class="chat-btn chat-send" id="chatSend">SEND &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<div class="dispatch-scrim" id="dispatchScrim"></div>
+<div class="dispatch-modal" id="dispatchModal">
+  <div class="dispatch-head">
+    <div>Dispatch &rarr; <span class="target" id="dispatchTarget">—</span></div>
+    <button class="close" id="dispatchClose" title="Close">&times;</button>
+  </div>
+  <div class="dispatch-body">
+    <textarea class="dispatch-input" id="dispatchInput" placeholder="What should this agent do? Be specific — include constraints, success criteria, and what to touch."></textarea>
+  </div>
+  <div class="dispatch-foot">
+    <div class="phase-group" id="phaseGroup">
+      <button data-phase="plan">PLAN</button>
+      <button data-phase="execute" class="on">EXECUTE</button>
+      <button data-phase="ralph">RALPH</button>
+    </div>
+    <span class="phase-hint" id="phaseHint">run once, stop when done</span>
+    <button class="dispatch-submit" id="dispatchSubmit">DISPATCH &#x2197;</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="acc">&rarr;</span> dispatched</div>
+
+<script>
+/* =====================================================================
+   19-canvas — one HTML5 canvas, a camera transform, and the same six
+   constellations from 18. Pinch/zoom/pan. Nothing else.
+   ===================================================================== */
+
+// ---------- Constants & Entities (from 18/ATLAS) ----------
+// Placed in world space so they spread wide — default view sees ~2-3.
+// Units are world pixels; camera starts centered on CPA.
+const ENTITIES = [
+  { id: 'sutra',      name: 'Sutra',      type: 'meta',     form: 'nexus',     status: 'active',  hue: 48,  wx:     0, wy: -1950, radius: 300 },
+  { id: 'cpa',  name: 'CPA',  type: 'product',  form: 'hub',       status: 'active',  hue: 335, wx:     0, wy:     0, radius: 220 },
+  { id: 'prototypes', name: 'Prototypes', type: 'lab',      form: 'branching', status: 'active',  hue: 205, wx:  1450, wy:  -280, radius: 240 },
+  { id: 'content',    name: 'Content',    type: 'creative', form: 'stream',    status: 'active',  hue: 48,  wx:  1700, wy:   950, radius: 230 },
+  { id: 'legal', name: 'Legal', type: 'client',   form: 'pair',      status: 'warm',    hue: 148, wx:   250, wy:  1350, radius: 210 },
+  { id: 'biosync',    name: 'BioSync',    type: 'client',   form: 'pair',      status: 'warm',    hue: 178, wx: -1350, wy:  1000, radius: 200 },
+  { id: 'contrarian', name: 'Contrarian', type: 'brand',    form: 'seal',      status: 'dormant', hue: 265, wx: -1550, wy:  -400, radius: 150 },
+];
+
+const SEED_NODES = {
+  sutra: [
+    ['SUTRA-IDENTITY.md', 'decision'],   // core
+    // inner ring — planning & identity
+    ['CLAUDE.md',       'doc'],
+    ['TELOS.md',        'decision'],
+    ['TASKS.md',        'decision'],
+    ['GOALS.md',        'decision'],
+    ['CONTEXT.md',      'doc'],
+    ['LEARNED.md',      'note'],
+    // outer ring — folders & payloads
+    ['Projects/',       'code'],
+    ['Knowledge/',      'note'],
+    ['.claude/',        'code'],
+    ['.context/',       'note'],
+    ['Me/',             'note'],
+    ['AGENTS.md',       'doc'],
+    ['CONTEXT-PAYLOAD.md','doc'],
+    ['BACKLOG.md',      'note'],
+  ],
+  cpa: [
+    ['core', 'core'],
+    ['sms-webhook.ts', 'code'],
+    ['schema.sql', 'code'],
+    ['prompts.md', 'doc'],
+    ['toll-free-verif', 'decision'],
+    ['pricing.md', 'doc'],
+    ['onboarding.tsx', 'code'],
+    ['retention.md', 'doc'],
+    ['rate-audit.json', 'code'],
+  ],
+  prototypes: [
+    ['scratch', 'core'],
+    ['sutra-spec.md', 'doc'],
+    ['dispatch-ui-15', 'code'],
+    ['dispatch-ui-17', 'code'],
+    ['dispatch-ui-18', 'note'],
+    ['bases-notes.md', 'note'],
+  ],
+  content: [
+    ['essay-personal-os.md', 'doc'],
+    ['prototype-hour-03.md', 'note'],
+    ['thread-agents', 'note'],
+    ['newsletter-014.md', 'doc'],
+    ['voice-guide.md', 'doc'],
+  ],
+  legal: [
+    ['client-anchor', 'core'],
+    ['delivery-anchor', 'core'],
+    ['intake-notes.md', 'doc'],
+    ['appraisal-draft', 'note'],
+    ['comps-worksheet', 'code'],
+  ],
+  biosync: [
+    ['client-anchor', 'core'],
+    ['delivery-anchor', 'core'],
+    ['kickoff-notes.md', 'doc'],
+    ['scope-draft.md', 'note'],
+  ],
+  contrarian: [
+    ['core', 'core'],
+    ['voice.md', 'doc'],
+    ['palette.md', 'doc'],
+    ['positioning.md', 'doc'],
+    ['archive.md', 'note'],
+  ],
+};
+
+// Files that can grow into each entity as agents work
+const GROWTH_FILES = {
+  sutra:      [['ATLAS.md','doc'],['SKILLS.md','doc'],['MEMORY.md','note'],['NARRATIVES.md','doc'],['Projects/legal/CLAUDE.md','code'],['.claude/hooks/','code'],['ROUTINES.md','doc'],['PLANS.md','decision']],
+  cpa:  [['billing.ts','code'],['pairs.tsx','code'],['chat-ui.tsx','code'],['match-algo.ts','code'],['nps-survey.md','doc'],['push-notif.ts','code'],['feed.tsx','code'],['icebreakers.ts','code'],['daily-prompt.ts','code'],['paywall.tsx','code']],
+  prototypes: [['19-canvas','code'],['20-lanes','code'],['atlas-v2.md','doc'],['sutra-v2.md','doc'],['ctx-benchmark','code'],['dispatch-bench','code']],
+  content:    [['thread-sutra.md','doc'],['video-script.md','doc'],['newsletter-015.md','doc'],['essay-draft-2.md','doc'],['podcast-notes.md','note']],
+  legal: [['market-report.md','doc'],['timeline.md','doc'],['counter-offer.md','decision'],['client-brief.md','doc']],
+  biosync:    [['proposal-v2.md','doc'],['scope-final.md','decision'],['invoice-draft.md','doc']],
+  contrarian: [],
+};
+
+const AGENT_NAMES = ['Kit','Nova','Axel','Pax','Mira','Oren','Vex','Ilo'];
+const AGENT_LABELS = {
+  cpa: ['tune prompt', 'audit rate-limit', 'retention draft', 'webhook profile'],
+  prototypes: ['sketch 19', 'benchmark canvas', 'iterate onboarding'],
+  content: ['draft newsletter', 'outline thread', 'essay pass'],
+  legal: ['finalize comps', 'appraisal narrative'],
+  biosync: ['follow-up email'],
+  contrarian: ['archive prior'],
+};
+
+// Status -> visual multiplier
+const STATUS_BRIGHT = { active: 1.0, warm: 0.68, dormant: 0.4 };
+const STATUS_ALPHA  = { active: 0.95, warm: 0.72, dormant: 0.45 };
+
+// ---------- State ----------
+const state = {
+  entities: {},      // by id: { ...meta, cx, cy, nodes: [], edges: [] }
+  nodes: {},         // by nid: { x, y, kind, label, entity }
+  agents: [],        // { id, name, label, state, entity, x, y, targetNode, t }
+  selected: null,    // entity id
+  hoverEntity: null,
+  hoverAgent: null,
+  mode: 'map',
+  selectedAgent: null,   // agent object
+  nodeActivity: {},      // nid → count of agents currently on that node
+  spawnAnim: {},         // nid → { startTick } — new node pop-in animation
+  growthTimer: 0,        // ticks since last growth
+  growthInterval: 480,   // ~8s at 60fps
+  // Camera
+  cam: { x: 0, y: 0, scale: 1, targetX: 0, targetY: 0, targetScale: 1 },
+  // Interaction
+  pointerDown: false,
+  dragStart: null,
+  dragMoved: false,
+  lastPoint: null,
+  // Resource mocks
+  ctxUsed: 70000, ctxMax: 200000,
+  spend: 1.84,
+  memPct: 54,
+  tick: 0,
+};
+
+// ---------- Canvas setup ----------
+const world = document.getElementById('world');
+const wctx = world.getContext('2d');
+const stars = document.getElementById('stars');
+const sctx = stars.getContext('2d');
+let DPR = Math.max(1, window.devicePixelRatio || 1);
+
+function sizeCanvases() {
+  DPR = Math.max(1, window.devicePixelRatio || 1);
+  const w = window.innerWidth, h = window.innerHeight;
+  [world, stars].forEach(c => {
+    c.width = Math.floor(w * DPR);
+    c.height = Math.floor(h * DPR);
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+  });
+  drawStars();
+}
+
+// ---------- PRNG (stable seed) ----------
+function prng(seed) {
+  let s = seed || 1;
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+}
+
+// ---------- Star field (fixed CSS-layer canvas) ----------
+function drawStars() {
+  const w = window.innerWidth, h = window.innerHeight;
+  sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  sctx.clearRect(0, 0, w, h);
+  const rand = prng(11);
+  for (let i = 0; i < 260; i++) {
+    const x = rand() * w;
+    const y = rand() * h;
+    const r = rand() * 0.85 + 0.2;
+    const a = rand() * 0.32 + 0.06;
+    sctx.fillStyle = `rgba(200,210,240,${a})`;
+    sctx.beginPath();
+    sctx.arc(x, y, r, 0, Math.PI * 2);
+    sctx.fill();
+  }
+}
+
+// ---------- Constellation builders (same semantics as 18) ----------
+function buildHub(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const spokes = 8;
+  const ringR = entity.radius * 0.62;
+  out.nodes.push({ id: entity.id + ':core', entity: entity.id, label: seeds[0][0], kind: seeds[0][1], x: cx, y: cy, isCore: true });
+  for (let i = 0; i < spokes; i++) {
+    const angle = -Math.PI / 2 + (i / spokes) * Math.PI * 2;
+    const seed = seeds[1 + i];
+    const lbl = seed ? seed[0] : 'spoke-' + i;
+    const kind = seed ? seed[1] : 'note';
+    const nid = entity.id + ':spoke-' + i;
+    out.nodes.push({
+      id: nid, entity: entity.id, label: lbl, kind,
+      x: cx + Math.cos(angle) * ringR,
+      y: cy + Math.sin(angle) * ringR,
+    });
+    out.edges.push({ a: entity.id + ':core', b: nid });
+  }
+  return out;
+}
+
+function buildBranching(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const rootY = cy + entity.radius * 0.55;
+  out.nodes.push({ id: entity.id + ':root', entity: entity.id, label: seeds[0][0], kind: seeds[0][1], x: cx, y: rootY, isCore: true });
+  const branchSeeds = seeds.slice(1);
+  const layout = [
+    { parent: 'root', ang: -Math.PI / 2 - 0.4, len: 0.34 },
+    { parent: 'root', ang: -Math.PI / 2 + 0.4, len: 0.34 },
+    { parent: 'b0',   ang: -Math.PI / 2 - 0.75, len: 0.28 },
+    { parent: 'b0',   ang: -Math.PI / 2 - 0.15, len: 0.28 },
+    { parent: 'b1',   ang: -Math.PI / 2 + 0.15, len: 0.26 },
+    { parent: 'b1',   ang: -Math.PI / 2 + 0.75, len: 0.26 },
+  ];
+  const coords = { root: { x: cx, y: rootY } };
+  layout.forEach((l, i) => {
+    const seed = branchSeeds[i]; if (!seed) return;
+    const parentKey = l.parent;
+    const pp = coords[parentKey]; if (!pp) return;
+    const len = entity.radius * l.len;
+    const x = pp.x + Math.cos(l.ang) * len;
+    const y = pp.y + Math.sin(l.ang) * len;
+    const lid = 'b' + i;
+    coords[lid] = { x, y };
+    const nid = entity.id + ':' + lid;
+    out.nodes.push({ id: nid, entity: entity.id, label: seed[0], kind: seed[1], x, y });
+    out.edges.push({ a: entity.id + ':' + (parentKey === 'root' ? 'root' : parentKey), b: nid });
+  });
+  return out;
+}
+
+function buildPair(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const span = entity.radius * 0.55;
+  out.nodes.push({ id: entity.id + ':anchor-a', entity: entity.id, label: seeds[0][0], kind: seeds[0][1], x: cx - span, y: cy, isCore: true });
+  out.nodes.push({ id: entity.id + ':anchor-b', entity: entity.id, label: seeds[1][0], kind: seeds[1][1], x: cx + span, y: cy, isCore: true });
+  out.edges.push({ a: entity.id + ':anchor-a', b: entity.id + ':anchor-b', isBridge: true });
+  const sats = seeds.slice(2);
+  sats.forEach((s, i) => {
+    const side = i % 2 === 0 ? 'a' : 'b';
+    const anchorX = side === 'a' ? cx - span : cx + span;
+    const baseAngle = side === 'a' ? Math.PI : 0;
+    const idxInSide = Math.floor(i / 2);
+    const ang = baseAngle + (idxInSide - 0.5) * 0.7 + (i * 0.13);
+    const r = entity.radius * 0.42;
+    const nid = entity.id + ':sat-' + i;
+    out.nodes.push({
+      id: nid, entity: entity.id, label: s[0], kind: s[1],
+      x: anchorX + Math.cos(ang) * r,
+      y: cy + Math.sin(ang) * r,
+    });
+    out.edges.push({ a: entity.id + (side === 'a' ? ':anchor-a' : ':anchor-b'), b: nid });
+  });
+  return out;
+}
+
+function buildSeal(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const r = entity.radius * 0.48;
+  out.nodes.push({ id: entity.id + ':core', entity: entity.id, label: seeds[0][0], kind: seeds[0][1], x: cx, y: cy, isCore: true });
+  const companions = seeds.slice(1, 6);
+  const n = Math.max(4, companions.length);
+  companions.forEach((s, i) => {
+    const angle = -Math.PI / 2 + (i / n) * Math.PI * 2;
+    const nid = entity.id + ':comp-' + i;
+    out.nodes.push({
+      id: nid, entity: entity.id, label: s[0], kind: s[1],
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+    });
+    out.edges.push({ a: entity.id + ':core', b: nid });
+    if (i > 0) out.edges.push({ a: entity.id + ':comp-' + (i - 1), b: nid });
+  });
+  if (companions.length >= 3) {
+    out.edges.push({ a: entity.id + ':comp-0', b: entity.id + ':comp-' + (companions.length - 1) });
+  }
+  return out;
+}
+
+function buildStream(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const n = seeds.length;
+  const startX = cx - entity.radius * 0.72;
+  const startY = cy - entity.radius * 0.5;
+  const endX   = cx + entity.radius * 0.72;
+  const endY   = cy + entity.radius * 0.5;
+  const dx = endX - startX, dy = endY - startY;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len, py = dx / len;
+  seeds.forEach((s, i) => {
+    const t = n <= 1 ? 0.5 : i / (n - 1);
+    const wave = Math.sin(i * 1.3) * entity.radius * 0.08;
+    const x = startX + dx * t + px * wave;
+    const y = startY + dy * t + py * wave;
+    const nid = entity.id + ':link-' + i;
+    out.nodes.push({ id: nid, entity: entity.id, label: s[0], kind: s[1], x, y, isCore: i === 0 });
+    if (i > 0) out.edges.push({ a: entity.id + ':link-' + (i - 1), b: nid });
+  });
+  return out;
+}
+
+// Nexus: core + inner ring + outer ring. Reserved for the Sutra meta-entity.
+function buildNexus(entity, seeds) {
+  const out = { nodes: [], edges: [] };
+  const cx = entity.cx, cy = entity.cy;
+  const coreSeed = seeds[0];
+  const rest = seeds.slice(1);
+  const innerCount = Math.min(6, Math.ceil(rest.length / 2));
+  const inner = rest.slice(0, innerCount);
+  const outer = rest.slice(innerCount);
+
+  const r1 = entity.radius * 0.42;
+  const r2 = entity.radius * 0.82;
+
+  out.nodes.push({ id: entity.id + ':core', entity: entity.id, label: coreSeed[0], kind: coreSeed[1], x: cx, y: cy, isCore: true });
+
+  inner.forEach((s, i) => {
+    const angle = -Math.PI / 2 + (i / inner.length) * Math.PI * 2;
+    const nid = entity.id + ':in-' + i;
+    out.nodes.push({
+      id: nid, entity: entity.id, label: s[0], kind: s[1],
+      x: cx + Math.cos(angle) * r1,
+      y: cy + Math.sin(angle) * r1,
+    });
+    out.edges.push({ a: entity.id + ':core', b: nid });
+  });
+
+  // Outer ring offset by half-slot so it interleaves visually
+  const outerAngleOffset = Math.PI / Math.max(outer.length, 1);
+  outer.forEach((s, i) => {
+    const angle = -Math.PI / 2 + (i / outer.length) * Math.PI * 2 + outerAngleOffset * 0.4;
+    const nid = entity.id + ':out-' + i;
+    out.nodes.push({
+      id: nid, entity: entity.id, label: s[0], kind: s[1],
+      x: cx + Math.cos(angle) * r2,
+      y: cy + Math.sin(angle) * r2,
+    });
+    // Connect to nearest inner node
+    if (inner.length) {
+      const nearestInnerIdx = Math.round((i / outer.length) * inner.length) % inner.length;
+      out.edges.push({ a: entity.id + ':in-' + nearestInnerIdx, b: nid });
+    } else {
+      out.edges.push({ a: entity.id + ':core', b: nid });
+    }
+  });
+
+  // Faint ring edges connecting inner siblings (the "sutra circle")
+  for (let i = 0; i < inner.length; i++) {
+    const j = (i + 1) % inner.length;
+    out.edges.push({ a: entity.id + ':in-' + i, b: entity.id + ':in-' + j, isBridge: true });
+  }
+
+  return out;
+}
+
+const BUILDERS = { hub: buildHub, branching: buildBranching, pair: buildPair, seal: buildSeal, stream: buildStream, nexus: buildNexus };
+
+// ---------- Seed constellations ----------
+function seedConstellations() {
+  ENTITIES.forEach(e => {
+    state.entities[e.id] = { ...e, cx: e.wx, cy: e.wy, nodeIds: [], edges: [] };
+  });
+  Object.entries(SEED_NODES).forEach(([eid, seeds]) => {
+    const entity = state.entities[eid];
+    const built = BUILDERS[entity.form](entity, seeds);
+    built.nodes.forEach(n => {
+      state.nodes[n.id] = n;
+      entity.nodeIds.push(n.id);
+    });
+    entity.edges = built.edges;
+  });
+}
+
+// ---------- Seed agents ----------
+function seedAgents() {
+  const picks = [
+    { entity: 'sutra',     name: 'Claude', label: 'iterate canvas UI',    state: 'working', primary: true },
+    { entity: 'cpa', name: 'Nova',  label: 'toll-free verify',    state: 'needs-input' },
+    { entity: 'cpa', name: 'Kit',   label: 'tune prompt',         state: 'working' },
+    { entity: 'prototypes',name: 'Mira',  label: 'sketch 19',           state: 'working' },
+    { entity: 'prototypes',name: 'Axel',  label: 'benchmark canvas',    state: 'working' },
+    { entity: 'content',   name: 'Pax',   label: 'draft newsletter',    state: 'working' },
+    { entity: 'legal',name: 'Oren',  label: 'finalize comps',      state: 'working' },
+    { entity: 'biosync',   name: 'Ilo',   label: 'follow-up email',     state: 'idle' },
+  ];
+  picks.forEach((p, i) => {
+    const ent = state.entities[p.entity];
+    const nodeIds = ent.nodeIds;
+    const target = nodeIds[(i + 1) % nodeIds.length];
+    const tnode = state.nodes[target];
+    state.agents.push({
+      id: 'ag-' + i,
+      name: p.name,
+      label: p.label,
+      state: p.state,
+      entity: p.entity,
+      primary: !!p.primary,
+      x: tnode.x, y: tnode.y,
+      targetNode: target,
+      prevNode: target,
+      t: Math.random(),
+      speed: 0.004 + Math.random() * 0.003,
+    });
+  });
+}
+
+// ---------- Node growth ----------
+function accreteNode(ent, label, kind) {
+  // Find the agent currently on this entity to determine spawn position
+  const activeAgent = state.agents.find(a => a.entity === ent.id && a.state !== 'needs-input');
+  // Attach to: agent's current node, or random existing node
+  const anchorId = (activeAgent && activeAgent.targetNode) || ent.nodeIds[Math.floor(Math.random() * ent.nodeIds.length)];
+  const anchor = state.nodes[anchorId];
+  if (!anchor) return;
+
+  // Place new node near the anchor, slightly outward from entity center
+  const dx = anchor.x - ent.cx, dy = anchor.y - ent.cy;
+  const dist = Math.hypot(dx, dy) || 1;
+  const spread = 60 + Math.random() * 60;
+  const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+  const nx = anchor.x + Math.cos(angle) * spread;
+  const ny = anchor.y + Math.sin(angle) * spread;
+
+  const nid = ent.id + ':grown-' + Date.now();
+  const node = { id: nid, entity: ent.id, label, kind, x: nx, y: ny };
+  state.nodes[nid] = node;
+  ent.nodeIds.push(nid);
+  ent.edges.push({ a: anchorId, b: nid });
+
+  // Trigger pop-in animation
+  state.spawnAnim[nid] = { startTick: state.tick };
+}
+
+// ---------- Camera transform helpers ----------
+function screenToWorld(sx, sy) {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  return {
+    x: (sx - cx) / state.cam.scale + state.cam.x,
+    y: (sy - cy) / state.cam.scale + state.cam.y,
+  };
+}
+function worldToScreen(wx, wy) {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  return {
+    x: (wx - state.cam.x) * state.cam.scale + cx,
+    y: (wy - state.cam.y) * state.cam.scale + cy,
+  };
+}
+
+// ---------- Zoom utilities ----------
+const MIN_Z = 0.3, MAX_Z = 2.5;
+function clampZoom(z) { return Math.max(MIN_Z, Math.min(MAX_Z, z)); }
+
+function zoomAtPoint(worldX, worldY, newScale) {
+  // Keep (worldX, worldY) pinned under the same screen pos after zooming.
+  // screenX = (worldX - camX)*scale + cx  -->  camX = worldX - (screenX - cx)/scale
+  // We want the world point under the same screen point. Work from current screen pos:
+  const screen = worldToScreen(worldX, worldY);
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  state.cam.targetScale = clampZoom(newScale);
+  state.cam.targetX = worldX - (screen.x - cx) / state.cam.targetScale;
+  state.cam.targetY = worldY - (screen.y - cy) / state.cam.targetScale;
+}
+
+function focusEntity(eid, scale) {
+  const e = state.entities[eid];
+  if (!e) return;
+  state.cam.targetX = e.cx;
+  state.cam.targetY = e.cy;
+  state.cam.targetScale = clampZoom(scale || 1.3);
+}
+
+// ---------- Hit testing ----------
+function pickEntityAt(worldX, worldY) {
+  // Return entity whose node cluster bounding circle contains the point
+  for (const e of Object.values(state.entities)) {
+    const dx = worldX - e.cx, dy = worldY - e.cy;
+    if (dx * dx + dy * dy <= (e.radius * 1.1) * (e.radius * 1.1)) {
+      return e.id;
+    }
+  }
+  return null;
+}
+
+function pickAgentAt(worldX, worldY) {
+  // Agent hit radius scaled by zoom — convert 10px screen to world
+  const rWorld = 10 / state.cam.scale;
+  for (const a of state.agents) {
+    const dx = worldX - a.x, dy = worldY - a.y;
+    if (dx * dx + dy * dy <= rWorld * rWorld) return a;
+  }
+  return null;
+}
+
+// ---------- Drawing ----------
+function drawBg() {
+  // Dot-grid in world space, very low opacity
+  const w = window.innerWidth, h = window.innerHeight;
+  const spacing = 60;
+  const s = state.cam.scale;
+  const effSpacing = spacing * s;
+  if (effSpacing < 12) return; // skip if too dense
+  const offsetX = (-state.cam.x * s) % effSpacing;
+  const offsetY = (-state.cam.y * s) % effSpacing;
+  const cx = w / 2, cy = h / 2;
+  // shift origin such that world (0,0) lands where camera projects
+  const baseX = cx + offsetX;
+  const baseY = cy + offsetY;
+  wctx.fillStyle = 'rgba(120,130,170,0.06)';
+  for (let x = baseX - Math.ceil(w / effSpacing + 2) * effSpacing; x < w + effSpacing; x += effSpacing) {
+    for (let y = baseY - Math.ceil(h / effSpacing + 2) * effSpacing; y < h + effSpacing; y += effSpacing) {
+      wctx.beginPath();
+      wctx.arc(x, y, 1, 0, Math.PI * 2);
+      wctx.fill();
+    }
+  }
+}
+
+function drawEntityHalo(e) {
+  const s = state.cam.scale;
+  const pos = worldToScreen(e.cx, e.cy);
+  const r = e.radius * s;
+  const bright = STATUS_BRIGHT[e.status];
+  const alpha = 0.05 * bright;
+  const grad = wctx.createRadialGradient(pos.x, pos.y, r * 0.2, pos.x, pos.y, r * 1.3);
+  grad.addColorStop(0, `hsla(${e.hue}, 60%, 60%, ${alpha})`);
+  grad.addColorStop(1, 'hsla(0,0%,0%,0)');
+  wctx.fillStyle = grad;
+  wctx.beginPath();
+  wctx.arc(pos.x, pos.y, r * 1.3, 0, Math.PI * 2);
+  wctx.fill();
+}
+
+function drawSelectionRing(e) {
+  const s = state.cam.scale;
+  const pos = worldToScreen(e.cx, e.cy);
+  const r = e.radius * s * 1.05;
+  wctx.strokeStyle = 'rgba(245,183,61,0.9)';
+  wctx.lineWidth = 1.2;
+  wctx.setLineDash([4, 4]);
+  wctx.beginPath();
+  wctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+  wctx.stroke();
+  wctx.setLineDash([]);
+}
+
+function drawEdges(e) {
+  const bright = STATUS_BRIGHT[e.status];
+  const alpha = STATUS_ALPHA[e.status];
+  wctx.lineWidth = 0.8;
+  e.edges.forEach(ed => {
+    const na = state.nodes[ed.a], nb = state.nodes[ed.b];
+    if (!na || !nb) return;
+    const a = worldToScreen(na.x, na.y), b = worldToScreen(nb.x, nb.y);
+    const isBridge = ed.isBridge;
+    wctx.strokeStyle = isBridge
+      ? `hsla(${e.hue}, 45%, 70%, ${0.28 * alpha})`
+      : `hsla(${e.hue}, 28%, 60%, ${0.22 * alpha})`;
+    wctx.lineWidth = isBridge ? 1.1 : 0.8;
+    wctx.beginPath();
+    wctx.moveTo(a.x, a.y);
+    wctx.lineTo(b.x, b.y);
+    wctx.stroke();
+  });
+}
+
+// Per-kind visual properties
+const KIND_HUE_SHIFT = { code: 0, doc: 22, decision: 0, note: -18, core: 0 };
+const KIND_SAT       = { code: 82, doc: 52, decision: 90, note: 38, core: 88 };
+const KIND_LIT       = { code: 72, doc: 65, decision: 76, note: 60, core: 80 };
+const KIND_ALPHA     = { code: 1.0, doc: 0.78, decision: 1.0, note: 0.58, core: 1.0 };
+
+function drawNodes(e) {
+  const bright = STATUS_BRIGHT[e.status];
+  const alpha  = STATUS_ALPHA[e.status];
+  e.nodeIds.forEach(nid => {
+    const n = state.nodes[nid];
+    if (!n) return;
+    const pos = worldToScreen(n.x, n.y);
+    const isCore = n.isCore;
+    const kind   = isCore ? 'core' : (n.kind || 'note');
+    const actCnt = state.nodeActivity[nid] || 0;
+    const isActive = actCnt > 0;
+    const isAgSel   = state.selectedAgent && state.selectedAgent.targetNode === nid;
+    const rPx = isCore ? 4.5 : 2.8;
+
+    // Decision nodes borrow the accent hue rather than entity hue
+    const nodeHue = kind === 'decision' ? 48 : e.hue + (KIND_HUE_SHIFT[kind] || 0);
+    const nodeSat = KIND_SAT[kind] || 70;
+    const nodeLit = KIND_LIT[kind] || 72;
+    const nodeAlp = (KIND_ALPHA[kind] || 0.9) * alpha;
+
+    // Extra glow ring for agent-selected node
+    if (isAgSel) {
+      const pulse = 0.55 + 0.45 * Math.sin(state.tick * 0.09);
+      const gr = 30;
+      const ag = wctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, gr);
+      ag.addColorStop(0, `hsla(${nodeHue}, 85%, 75%, ${0.55 * bright * pulse})`);
+      ag.addColorStop(1, 'hsla(0,0%,0%,0)');
+      wctx.fillStyle = ag;
+      wctx.beginPath();
+      wctx.arc(pos.x, pos.y, gr, 0, Math.PI * 2);
+      wctx.fill();
+    }
+
+    // Activity glow (agent nearby but not selected)
+    if (isActive && !isAgSel) {
+      const ag2 = wctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 18);
+      ag2.addColorStop(0, `hsla(${nodeHue}, 78%, 72%, ${0.32 * bright})`);
+      ag2.addColorStop(1, 'hsla(0,0%,0%,0)');
+      wctx.fillStyle = ag2;
+      wctx.beginPath();
+      wctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2);
+      wctx.fill();
+    }
+
+    // Base glow halo
+    const glowR = isCore ? 16 : (isActive ? 10 : 6);
+    const g = wctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
+    g.addColorStop(0, `hsla(${nodeHue}, ${nodeSat}%, ${nodeLit}%, ${0.6 * bright * (isActive ? 1.5 : 1)})`);
+    g.addColorStop(1, 'hsla(0,0%,0%,0)');
+    wctx.fillStyle = g;
+    wctx.beginPath();
+    wctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2);
+    wctx.fill();
+
+    // Core dot
+    wctx.fillStyle = `hsla(${nodeHue}, ${nodeSat}%, ${nodeLit}%, ${nodeAlp * (isActive ? 1.0 : 1)})`;
+    wctx.beginPath();
+    wctx.arc(pos.x, pos.y, rPx * (isActive ? 1.18 : 1), 0, Math.PI * 2);
+    wctx.fill();
+
+    // Spawn pop-in ring (new node animation)
+    const spawn = state.spawnAnim[nid];
+    if (spawn) {
+      const t = Math.min(1, (state.tick - spawn.startTick) / 50);
+      const ringR = rPx * (1 + (1 - t) * 9);
+      const ringA = (1 - t) * 0.8;
+      wctx.strokeStyle = `hsla(${nodeHue}, 80%, 80%, ${ringA})`;
+      wctx.lineWidth = 1.2;
+      wctx.beginPath();
+      wctx.arc(pos.x, pos.y, ringR, 0, Math.PI * 2);
+      wctx.stroke();
+      if (t >= 1) delete state.spawnAnim[nid];
+    }
+  });
+}
+
+function drawEntityLabel(e) {
+  const pos = worldToScreen(e.cx, e.cy);
+  const below = pos.y + e.radius * state.cam.scale + 18;
+  const isSel = state.selected === e.id;
+  const isHover = state.hoverEntity === e.id;
+  const sharp = isSel || isHover;
+  wctx.save();
+  wctx.textAlign = 'center';
+  wctx.textBaseline = 'top';
+  wctx.font = '600 11px "JetBrains Mono", monospace';
+  wctx.fillStyle = sharp ? '#e7e9f2' : (e.status === 'dormant' ? '#6a6f85' : '#b8bccf');
+  // Letterspacing-ish effect: write upper case with tracking
+  const nameUp = e.name.toUpperCase();
+  wctx.fillText(spaced(nameUp), pos.x, below);
+
+  // Form tag under the name
+  wctx.font = '400 9px "JetBrains Mono", monospace';
+  wctx.fillStyle = sharp ? '#8a8fa5' : '#4a4e63';
+  wctx.fillText(e.form + '  ·  ' + e.status, pos.x, below + 14);
+  wctx.restore();
+}
+
+function spaced(str) {
+  return str.split('').join(' ');
+}
+
+// Show individual node labels as you zoom in
+function drawNodeLabels(e) {
+  const s = state.cam.scale;
+  if (s < 0.65) return; // too far out
+  const isSel = state.selected === e.id;
+  const zoomAlpha = Math.min(1, (s - 0.65) / 0.55); // fade in 0.65→1.2
+  if (!isSel && s < 1.0) return; // non-selected entities only show labels close-up
+  const bright = STATUS_BRIGHT[e.status];
+
+  e.nodeIds.forEach(nid => {
+    const n = state.nodes[nid];
+    if (!n || n.isCore) return; // core uses entity name label
+    const pos = worldToScreen(n.x, n.y);
+    const kind = n.kind || 'note';
+    const actCnt = state.nodeActivity[nid] || 0;
+    const isAgSel = state.selectedAgent && state.selectedAgent.targetNode === nid;
+    const isActive = actCnt > 0 || isAgSel;
+
+    const KIND_COLOR = { code: [126,200,184], doc: [200,184,126], decision: [245,183,61], note: [122,126,154] };
+    const [r,g,b] = KIND_COLOR[kind] || [138,143,165];
+
+    const baseAlpha = zoomAlpha * bright * (isActive ? 1.0 : 0.55);
+
+    wctx.save();
+    wctx.textAlign = 'center';
+    wctx.textBaseline = 'top';
+    wctx.font = `${isActive ? '500' : '400'} 9px "JetBrains Mono", monospace`;
+    wctx.fillStyle = isActive
+      ? `rgba(231,233,242,${baseAlpha})`
+      : `rgba(${r},${g},${b},${baseAlpha * 0.85})`;
+
+    const label = n.label.length > 22 ? n.label.slice(0, 20) + '…' : n.label;
+    wctx.fillText(label, pos.x, pos.y + 7);
+
+    // kind tag — only show at high zoom
+    if (s > 1.5) {
+      wctx.font = '400 8px "JetBrains Mono", monospace';
+      wctx.fillStyle = `rgba(${r},${g},${b},${baseAlpha * 0.45})`;
+      wctx.fillText(kind, pos.x, pos.y + 18);
+    }
+    wctx.restore();
+  });
+}
+
+function drawAgent(a) {
+  const pos = worldToScreen(a.x, a.y);
+  const isNeedsInput = a.state === 'needs-input';
+  const isHover = state.hoverAgent && state.hoverAgent.id === a.id;
+  const isPrimary = a.primary;
+  const baseR = isPrimary ? (isHover ? 6 : 4.5) : (isHover ? 4.5 : 3.2);
+  const glowR = isPrimary ? 18 : (isNeedsInput ? 14 : 9);
+  const color = isPrimary ? [245, 183, 61] : (isNeedsInput ? [245, 183, 61] : [111, 225, 177]);
+  const pulse = isNeedsInput ? (0.5 + 0.5 * Math.sin(state.tick * 0.08)) :
+                isPrimary    ? (0.7 + 0.3 * Math.sin(state.tick * 0.04)) : 1;
+  const g = wctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
+  g.addColorStop(0, `rgba(${color.join(',')}, ${0.65 * pulse})`);
+  g.addColorStop(1, `rgba(${color.join(',')}, 0)`);
+  wctx.fillStyle = g;
+  wctx.beginPath();
+  wctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2);
+  wctx.fill();
+  wctx.fillStyle = `rgba(${color.join(',')}, 0.95)`;
+  wctx.beginPath();
+  wctx.arc(pos.x, pos.y, baseR, 0, Math.PI * 2);
+  wctx.fill();
+  // inner bright
+  wctx.fillStyle = 'rgba(255,255,255,0.95)';
+  wctx.beginPath();
+  wctx.arc(pos.x, pos.y, baseR * 0.4, 0, Math.PI * 2);
+  wctx.fill();
+  // Primary agent ring — marks "you" / active conversation
+  if (isPrimary) {
+    wctx.strokeStyle = `rgba(245,183,61,${0.55 + 0.25 * Math.sin(state.tick * 0.06)})`;
+    wctx.lineWidth = 1.1;
+    wctx.setLineDash([3, 3]);
+    wctx.beginPath();
+    wctx.arc(pos.x, pos.y, baseR + 3, 0, Math.PI * 2);
+    wctx.stroke();
+    wctx.setLineDash([]);
+  }
+}
+
+function draw() {
+  const W = world.width, H = world.height;
+  // Reset transform -> draw in CSS pixels
+  wctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  wctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  drawBg();
+
+  const entList = Object.values(state.entities);
+  // halos first
+  entList.forEach(drawEntityHalo);
+  // edges
+  entList.forEach(drawEdges);
+  // nodes
+  entList.forEach(drawNodes);
+  // selection ring
+  if (state.selected) drawSelectionRing(state.entities[state.selected]);
+  // agents
+  state.agents.forEach(drawAgent);
+  // entity labels
+  entList.forEach(drawEntityLabel);
+  // node-level file labels (zoom-dependent)
+  entList.forEach(drawNodeLabels);
+}
+
+// ---------- Gamepad helpers ----------
+// Haptic feedback via Gamepad Vibration API
+function vibrate(pattern) {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+
+  // Try vibrationActuator (newer API)
+  if (gp.vibrationActuator?.playEffect) {
+    const act = gp.vibrationActuator;
+    if (Array.isArray(pattern)) {
+      let delay = 0;
+      for (let i = 0; i < pattern.length; i += 2) {
+        setTimeout(() => {
+          act.playEffect('dual-rumble', {
+            startDelay: 0,
+            duration: pattern[i],
+            weakMagnitude: pattern[i + 1] * 0.3,
+            strongMagnitude: pattern[i + 1],
+          });
+        }, delay);
+        delay += pattern[i] + 20;
+      }
+    } else {
+      act.playEffect('dual-rumble', {
+        startDelay: 0,
+        duration: pattern[0],
+        weakMagnitude: pattern[1] * 0.3,
+        strongMagnitude: pattern[1],
+      });
+    }
+    return;
+  }
+
+  // Fallback: try hapticActuators array
+  if (gp.hapticActuators?.length > 0) {
+    const act = gp.hapticActuators[0];
+    if (Array.isArray(pattern)) {
+      let delay = 0;
+      for (let i = 0; i < pattern.length; i += 2) {
+        setTimeout(() => {
+          act.pulse(pattern[i + 1], pattern[i]);
+        }, delay);
+        delay += pattern[i] + 20;
+      }
+    } else {
+      act.pulse(pattern[1], pattern[0]);
+    }
+  }
+}
+
+function gpSnapToEntity(dx, dy) {
+  const cx = state.cam.x, cy = state.cam.y;
+  const ents = Object.values(state.entities);
+  const candidates = ents.filter(e => (e.cx - cx) * dx + (e.cy - cy) * dy > 50);
+  const pool = candidates.length ? candidates : ents;
+  const nearest = pool.reduce((best, e) => {
+    const d = Math.hypot(e.cx - cx, e.cy - cy);
+    return (!best || d < best.d) ? { e, d } : best;
+  }, null);
+  if (nearest) focusEntity(nearest.e.id, Math.max(state.cam.targetScale, 0.8));
+}
+
+function gpCyclePhase(dir) {
+  const agent = state.selectedAgent;
+  if (!agent) return;
+  const order = ['plan', 'execute', 'review'];
+  const cur = state.agentPhase[agent.id] || 'execute';
+  const idx = order.indexOf(cur);
+  const next = order[Math.max(0, Math.min(order.length - 1, idx + dir))];
+  state.agentPhase[agent.id] = next;
+  renderPhaseRibbon(agent);
+  if (next === 'review') {
+    vibrate([50, 0.4, 50, 0.6, 50, 0.8, 50, 1.0]); // crescendo into review
+    focusEntity(agent.entity, MAX_Z);
+    state.cam.targetScale = MAX_Z;
+  }
+}
+
+function gpCycleEntity(dir) {
+  const ents = Object.values(state.entities);
+  if (state.gpBaseIdx === undefined) {
+    state.gpBaseIdx = Math.max(0, ents.findIndex(e => e.id === state.selected));
+  }
+  state.gpBaseIdx = (state.gpBaseIdx + dir + ents.length) % ents.length;
+  const next = ents[state.gpBaseIdx];
+  focusEntity(next.id, Math.max(state.cam.targetScale, 0.8));
+  updateBaseNav(next.id);
+}
+
+function buildBaseNav() {
+  const nav = document.getElementById('baseNav');
+  nav.innerHTML = '';
+  Object.values(state.entities).forEach(e => {
+    const pip = document.createElement('div');
+    pip.className = 'base-pip';
+    pip.dataset.eid = e.id;
+    const color = `hsl(${e.hue},70%,60%)`;
+    pip.innerHTML = `<span class="dot" style="background:${color};box-shadow:0 0 6px hsl(${e.hue},70%,50%)"></span>${e.name}`;
+    pip.addEventListener('click', () => { focusEntity(e.id, Math.max(state.cam.targetScale, 0.8)); updateBaseNav(e.id); });
+    nav.appendChild(pip);
+  });
+}
+
+function updateBaseNav(eid) {
+  document.querySelectorAll('.base-pip').forEach(p => {
+    const active = p.dataset.eid === eid;
+    p.classList.toggle('active', active);
+    const dot = p.querySelector('.dot');
+    const e = state.entities[p.dataset.eid];
+    if (e) dot.style.boxShadow = active ? `0 0 10px hsl(${e.hue},80%,55%), 0 0 20px hsl(${e.hue},80%,40%)` : 'none';
+  });
+}
+
+// ---------- Animation loop ----------
+function tick() {
+  state.tick++;
+
+  // Poll gamepad (PS5 DualSense controller)
+  const gp = navigator.getGamepads()[0];
+  if (gp) {
+    const deadzone = 0.15;
+    const flickThreshold = 0.75;
+    const rawLx = gp.axes[0], rawLy = gp.axes[1];
+    const lx = Math.abs(rawLx) > deadzone ? rawLx : 0;
+    const ly = Math.abs(rawLy) > deadzone ? rawLy : 0;
+    const l2 = gp.buttons[6]?.pressed;
+    const r2 = gp.buttons[7]?.pressed;
+
+    if (l2 && r2) {
+      // Both triggers + left stick = zoom
+      if (Math.abs(rawLy) > deadzone) {
+        const factor = Math.exp(-rawLy * 0.025);
+        state.cam.targetScale = clampZoom(state.cam.targetScale * factor);
+      }
+    } else {
+      // Left stick: pan (world-space)
+      const s = state.cam.targetScale;
+      state.cam.targetX += lx * (9 / s);
+      state.cam.targetY += ly * (9 / s);
+
+      // Flick: snap to nearest entity in that direction
+      const prev = state.gpPrev || { lx: 0, ly: 0 };
+      if (Math.abs(rawLx) > flickThreshold && Math.abs(prev.lx) < 0.3) {
+        gpSnapToEntity(rawLx > 0 ? 1 : -1, 0);
+      } else if (Math.abs(rawLy) > flickThreshold && Math.abs(prev.ly) < 0.3) {
+        gpSnapToEntity(0, rawLy > 0 ? 1 : -1);
+      }
+    }
+    // Right stick Y: zoom
+    const rawRy = gp.axes[3];
+    if (Math.abs(rawRy) > deadzone) {
+      const factor = Math.exp(rawRy * 0.04);
+      state.cam.targetScale = clampZoom(state.cam.targetScale * factor);
+    }
+
+    state.gpPrev = { lx: rawLx, ly: rawLy };
+
+    // Buttons — fire once on press (not held)
+    if (!state.gpBtn) state.gpBtn = {};
+    const btn = (i) => gp.buttons[i]?.pressed;
+    const wasBtn = (i) => !!state.gpBtn[i];
+
+    if (btn(0) && !wasBtn(0)) { // Cross: drill in toward center
+      const s = state.cam.targetScale;
+      const cx = state.cam.x, cy = state.cam.y;
+      const ents = Object.values(state.entities);
+      const nearestEnt = ents.reduce((best, e) => {
+        const d = Math.hypot(e.cx - cx, e.cy - cy);
+        return (!best || d < best.d) ? { e, d } : best;
+      }, null);
+      if (s < 1.0 && nearestEnt) {
+        // Overview → zoom into nearest base
+        vibrate([100, 0.7]);
+        focusEntity(nearestEnt.e.id, 1.1);
+        updateBaseNav(nearestEnt.e.id);
+        state.gpBaseIdx = ents.indexOf(nearestEnt.e);
+      } else {
+        // Base view → open nearest agent
+        const nearestAgent = state.agents.reduce((best, a) => {
+          const d = Math.hypot(a.x - cx, a.y - cy);
+          return (!best || d < best.d) ? { a, d } : best;
+        }, null);
+        if (nearestAgent) {
+          vibrate([50, 0.8, 50, 0.8]); // double tap
+          selectAgent(nearestAgent.a);
+        }
+      }
+    }
+    if (btn(1) && !wasBtn(1)) { // Circle: back out one zoom layer
+      const s = state.cam.targetScale;
+      if (s > 1.4) {
+        // Detail → single base: focus nearest entity at mid zoom
+        vibrate([60, 0.5, 60, 0.5]);
+        const ents = Object.values(state.entities);
+        const nearest = ents.reduce((best, e) => {
+          const d = Math.hypot(e.cx - state.cam.x, e.cy - state.cam.y);
+          return (!best || d < best.d) ? { e, d } : best;
+        }, null);
+        if (nearest) focusEntity(nearest.e.id, 1.0);
+        closeChat(); closeDispatch();
+      } else if (s > 0.5) {
+        // Single base → overview: zoom out to see all
+        vibrate([40, 0.4, 40, 0.4, 40, 0.4]);
+        state.cam.targetScale = clampZoom(0.33);
+        state.cam.targetX = 200; state.cam.targetY = 200;
+        selectEntity(null); closeChat(); closeDispatch();
+        updateBaseNav(null);
+      }
+      // Already at overview: do nothing
+    }
+    if (btn(3) && !wasBtn(3)) {
+      vibrate([120, 0.9]); // Triangle: strong pulse
+      focusEntity(null); state.cam.targetScale = clampZoom(0.35);
+    }
+
+    const panelOpen = document.getElementById('chatPanel').classList.contains('open');
+    if (btn(4) && !wasBtn(4)) {
+      vibrate([80, 0.6]);
+      panelOpen ? gpCyclePhase(-1) : gpCycleEntity(-1);
+    }
+    if (btn(5) && !wasBtn(5)) {
+      vibrate([80, 0.6]);
+      panelOpen ? gpCyclePhase(1) : gpCycleEntity(1);
+    }
+    [0,1,2,3,4,5,6,7].forEach(i => { state.gpBtn[i] = btn(i); });
+  }
+
+  // Ease camera toward target
+  const k = 0.14;
+  state.cam.x   += (state.cam.targetX   - state.cam.x)   * k;
+  state.cam.y   += (state.cam.targetY   - state.cam.y)   * k;
+  state.cam.scale += (state.cam.targetScale - state.cam.scale) * k;
+  // Update zoom label
+  updateZoomLabel();
+
+  // Recompute nodeActivity from current agent positions
+  state.nodeActivity = {};
+  state.agents.forEach(a => {
+    if (a.targetNode) {
+      state.nodeActivity[a.targetNode] = (state.nodeActivity[a.targetNode] || 0) + 1;
+    }
+  });
+
+  // Agents drift between nodes within their entity
+  state.agents.forEach(a => {
+    if (a.state === 'needs-input') return; // stays on node
+    a.t += a.speed;
+    if (a.t >= 1) {
+      const ent = state.entities[a.entity];
+      const opts = ent.nodeIds.filter(n => n !== a.targetNode);
+      const nextId = opts[Math.floor(Math.random() * opts.length)] || a.targetNode;
+      a.prevNode = a.targetNode;
+      a.targetNode = nextId;
+      a.t = 0;
+    }
+    const pn = state.nodes[a.prevNode];
+    const tn = state.nodes[a.targetNode];
+    const et = a.t * a.t * (3 - 2 * a.t);
+    a.x = pn.x + (tn.x - pn.x) * et;
+    a.y = pn.y + (tn.y - pn.y) * et;
+  });
+
+  // Growth: active entities accrete new file nodes over time
+  state.growthTimer++;
+  if (state.growthTimer >= state.growthInterval) {
+    state.growthTimer = 0;
+    // pick a random active entity that has growth files remaining
+    const growable = Object.values(state.entities).filter(e => {
+      const pool = GROWTH_FILES[e.id];
+      return e.status === 'active' && pool && pool.length > 0;
+    });
+    if (growable.length > 0) {
+      const ent = growable[Math.floor(Math.random() * growable.length)];
+      const pool = GROWTH_FILES[ent.id];
+      const idx = Math.floor(Math.random() * pool.length);
+      const [label, kind] = pool.splice(idx, 1)[0]; // consume from pool
+      accreteNode(ent, label, kind);
+    }
+  }
+
+  draw();
+  requestAnimationFrame(tick);
+}
+
+// ---------- Zoom UI ----------
+function updateZoomLabel() {
+  document.getElementById('zoomLabel').textContent = Math.round(state.cam.scale * 100) + '%';
+}
+
+// ---------- Events: zoom, pan, drag, click ----------
+world.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  if (ev.ctrlKey) {
+    // pinch-zoom on trackpad (Mac emits ctrlKey during pinch)
+    const pt = screenToWorld(ev.clientX, ev.clientY);
+    const factor = Math.exp(-ev.deltaY * 0.01);
+    const newScale = clampZoom(state.cam.targetScale * factor);
+    zoomAtPoint(pt.x, pt.y, newScale);
+  } else {
+    // two-finger trackpad pan
+    const s = state.cam.targetScale;
+    state.cam.targetX += ev.deltaX / s;
+    state.cam.targetY += ev.deltaY / s;
+  }
+}, { passive: false });
+
+// Pointer drag to pan
+world.addEventListener('pointerdown', (ev) => {
+  state.pointerDown = true;
+  state.dragStart = { x: ev.clientX, y: ev.clientY, camX: state.cam.targetX, camY: state.cam.targetY, t: Date.now() };
+  state.dragMoved = false;
+  world.setPointerCapture(ev.pointerId);
+  world.classList.add('grabbing');
+});
+
+world.addEventListener('pointermove', (ev) => {
+  // hover detection (when not dragging)
+  if (!state.pointerDown) {
+    const w = screenToWorld(ev.clientX, ev.clientY);
+    const ag = pickAgentAt(w.x, w.y);
+    state.hoverAgent = ag;
+    state.hoverEntity = ag ? null : pickEntityAt(w.x, w.y);
+    updateAgentTip(ag, ev.clientX, ev.clientY);
+    world.style.cursor = (ag || state.hoverEntity) ? 'pointer' : 'grab';
+    return;
+  }
+  const dx = ev.clientX - state.dragStart.x;
+  const dy = ev.clientY - state.dragStart.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) state.dragMoved = true;
+  state.cam.targetX = state.dragStart.camX - dx / state.cam.targetScale;
+  state.cam.targetY = state.dragStart.camY - dy / state.cam.targetScale;
+});
+
+world.addEventListener('pointerup', (ev) => {
+  const wasDown = state.pointerDown;
+  state.pointerDown = false;
+  world.classList.remove('grabbing');
+  world.style.cursor = 'grab';
+  if (!wasDown) return;
+  if (state.dragMoved) return;
+  // treat as click
+  const w = screenToWorld(ev.clientX, ev.clientY);
+  const agent = pickAgentAt(w.x, w.y);
+  if (agent) {
+    selectAgent(agent);
+    return;
+  }
+  const eid = pickEntityAt(w.x, w.y);
+  selectEntity(eid);
+  state.selectedAgent = null;
+  if (!eid) closeChat();
+});
+
+world.addEventListener('pointercancel', () => {
+  state.pointerDown = false;
+  world.classList.remove('grabbing');
+});
+
+// Double-click: zoom-to-fit the entity
+world.addEventListener('dblclick', (ev) => {
+  const w = screenToWorld(ev.clientX, ev.clientY);
+  const eid = pickEntityAt(w.x, w.y);
+  if (eid) {
+    const e = state.entities[eid];
+    // fit: pick scale so diameter fits in 70% of smallest viewport dim
+    const minDim = Math.min(window.innerWidth, window.innerHeight);
+    const target = clampZoom((minDim * 0.7) / (e.radius * 2));
+    state.cam.targetX = e.cx;
+    state.cam.targetY = e.cy;
+    state.cam.targetScale = target;
+    selectEntity(eid);
+  }
+});
+
+// Keyboard: +/- zoom, arrows pan
+window.addEventListener('keydown', (ev) => {
+  if (ev.target && ['INPUT','TEXTAREA'].includes(ev.target.tagName)) return;
+  const panStep = 80 / state.cam.targetScale;
+  if (ev.key === '+' || ev.key === '=') {
+    const pt = { x: state.cam.x, y: state.cam.y };
+    zoomAtPoint(pt.x, pt.y, state.cam.targetScale * 1.15);
+    ev.preventDefault();
+  } else if (ev.key === '-' || ev.key === '_') {
+    const pt = { x: state.cam.x, y: state.cam.y };
+    zoomAtPoint(pt.x, pt.y, state.cam.targetScale / 1.15);
+    ev.preventDefault();
+  } else if (ev.key === 'ArrowLeft')  { state.cam.targetX -= panStep; ev.preventDefault(); }
+    else if (ev.key === 'ArrowRight') { state.cam.targetX += panStep; ev.preventDefault(); }
+    else if (ev.key === 'ArrowUp')    { state.cam.targetY -= panStep; ev.preventDefault(); }
+    else if (ev.key === 'ArrowDown')  { state.cam.targetY += panStep; ev.preventDefault(); }
+    else if (ev.key === 'Escape')     {
+      if (document.getElementById('dispatchModal').classList.contains('open')) { closeDispatch(); }
+      else if (document.getElementById('chatPanel').classList.contains('open')) { closeChat(); }
+      else { selectEntity(null); state.selectedAgent = null; }
+    }
+});
+
+// Zoom buttons
+document.getElementById('zoomIn').addEventListener('click', () => {
+  zoomAtPoint(state.cam.x, state.cam.y, state.cam.targetScale * 1.2);
+});
+document.getElementById('zoomOut').addEventListener('click', () => {
+  zoomAtPoint(state.cam.x, state.cam.y, state.cam.targetScale / 1.2);
+});
+
+// Gamepad connection listeners (for UI feedback)
+window.addEventListener('gamepadconnected', (ev) => {
+  console.log('Gamepad connected:', ev.gamepad.id);
+  console.log('Haptic support:', {
+    vibrationActuator: !!ev.gamepad.vibrationActuator,
+    hapticActuators: ev.gamepad.hapticActuators?.length || 0
+  });
+  document.getElementById('topBar').style.borderColor = '#88ff00';
+});
+window.addEventListener('gamepaddisconnected', (ev) => {
+  console.log('Gamepad disconnected');
+  document.getElementById('topBar').style.borderColor = 'rgba(255, 255, 255, 0.1)';
+});
+
+// Touch pinch (mobile)
+let touchPinch = null;
+world.addEventListener('touchstart', (ev) => {
+  if (ev.touches.length === 2) {
+    const [a, b] = ev.touches;
+    touchPinch = {
+      d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+      midX: (a.clientX + b.clientX) / 2,
+      midY: (a.clientY + b.clientY) / 2,
+      scale: state.cam.targetScale,
+    };
+  }
+}, { passive: true });
+world.addEventListener('touchmove', (ev) => {
+  if (ev.touches.length === 2 && touchPinch) {
+    const [a, b] = ev.touches;
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const pt = screenToWorld(touchPinch.midX, touchPinch.midY);
+    const factor = d / touchPinch.d;
+    zoomAtPoint(pt.x, pt.y, touchPinch.scale * factor);
+    ev.preventDefault();
+  }
+}, { passive: false });
+world.addEventListener('touchend', () => { touchPinch = null; }, { passive: true });
+
+// ---------- Selection / command strip ----------
+function selectAgent(agent) {
+  state.selectedAgent = agent;
+  state.selected = null;
+  // Close entity command strip
+  document.getElementById('cmdStrip').classList.remove('open');
+  document.getElementById('zoomMeta').classList.remove('strip-open');
+  document.getElementById('kindLegend').classList.remove('strip-open');
+
+  openChat(agent);
+  focusEntity(agent.entity, Math.max(state.cam.targetScale, 1.1));
+}
+
+function selectEntity(eid) {
+  state.selected = eid;
+  state.selectedAgent = null;
+  const strip = document.getElementById('cmdStrip');
+  const zm = document.getElementById('zoomMeta');
+  const kl = document.getElementById('kindLegend');
+  if (eid) {
+    const e = state.entities[eid];
+    document.getElementById('resLabelA').textContent = 'Focus';
+    document.getElementById('resLabelB').textContent = 'Heat';
+    document.getElementById('resLabelC').textContent = 'Queue';
+    document.getElementById('resLabelD').textContent = 'Updated';
+    document.getElementById('cmdName').textContent = e.name;
+    document.getElementById('cmdType').textContent = e.type + ' · ' + e.form;
+    // stubbed per-entity resources
+    const snap = entitySnapshot(e);
+    document.getElementById('resFocus').textContent  = snap.focus + '%';
+    document.getElementById('resFocusFill').style.width = snap.focus + '%';
+    document.getElementById('resHeat').textContent   = snap.heat.label;
+    document.getElementById('resHeatFill').style.width = snap.heat.pct + '%';
+    document.getElementById('resQueue').textContent  = snap.queue + ' tasks';
+    document.getElementById('resQueueFill').style.width = Math.min(100, snap.queue * 15) + '%';
+    document.getElementById('resUpdated').textContent = snap.updated;
+    strip.classList.add('open');
+    zm.classList.add('strip-open');
+    kl.classList.add('strip-open');
+  } else {
+    strip.classList.remove('open');
+    zm.classList.remove('strip-open');
+    kl.classList.remove('strip-open');
+  }
+}
+
+function entitySnapshot(e) {
+  // Simple deterministic mocks derived from status/type
+  const statusPct = { active: 80, warm: 50, dormant: 20 }[e.status];
+  const heat = { active: { label: 'hot',    pct: 88 }, warm: { label: 'warm', pct: 62 }, dormant: { label: 'cool', pct: 22 } }[e.status];
+  const q = e.status === 'active' ? 4 : e.status === 'warm' ? 2 : 0;
+  const updated = e.status === 'active' ? 'just now' : e.status === 'warm' ? '2d ago' : '3w ago';
+  return { focus: statusPct, heat, queue: q, updated };
+}
+
+document.querySelectorAll('.cmd-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cmd = btn.dataset.cmd;
+    const eid = state.selected;
+    if (!eid) return;
+    if (cmd === 'dispatch') {
+      openDispatch(eid);
+    } else {
+      flashToast(cmd + ' · ' + state.entities[eid].name);
+    }
+  });
+});
+
+// ---------- Agent chat panel ----------
+// Each agent gets a log (user/agent/system entries) and a phase (plan/execute/review).
+state.agentLogs = {};    // agentId → [{role, phase, text, t}]
+state.agentPhase = {};   // agentId → 'plan' | 'execute' | 'review'
+
+function ensureAgentLog(agent) {
+  if (state.agentLogs[agent.id]) return;
+  // Seed initial log based on agent state
+  const logs = [];
+  const phase = agent.phase || (agent.state === 'needs-input' ? 'execute' : 'execute');
+  state.agentPhase[agent.id] = phase;
+
+  if (agent.primary) {
+    logs.push({ role: 'system', phase: 'plan', text: 'Session opened · ' + agent.entity });
+    logs.push({ role: 'agent', phase: 'plan', text: 'Reviewed 18-constellation and the Sutra build timeline. Goal: strip chrome, pure canvas with pinch/zoom/pan.' });
+    logs.push({ role: 'user',  phase: 'plan', text: 'Go off of this sutra build and strip the excess UI above and below.' });
+    logs.push({ role: 'agent', phase: 'execute', text: 'Built 19-canvas. Full-viewport canvas, 40px glass top bar, constellations in world space. Deployed to ckelimarks.github.io.' });
+    logs.push({ role: 'user',  phase: 'execute', text: 'Develop interactions. When you click entities and agents? Files as nodes. Growth as you work.' });
+    logs.push({ role: 'agent', phase: 'execute', text: 'Done: kind coloring, node labels on zoom, activity glow, growth mechanic every ~8s, agent click → file info.' });
+    logs.push({ role: 'user',  phase: 'execute', text: 'Create something called Sutra on this mockup and mimic the folder structure.' });
+    logs.push({ role: 'agent', phase: 'execute', text: 'Added Sutra entity with nexus form mirroring Personal OS root. Added dispatch modal. Building chat panel now.' });
+  } else if (agent.state === 'needs-input') {
+    logs.push({ role: 'system', phase: 'plan', text: 'Dispatched to ' + agent.entity });
+    logs.push({ role: 'agent',  phase: 'plan', text: 'Plan: profile the toll-free verification flow. Check rate-audit.json for last ping.' });
+    logs.push({ role: 'agent',  phase: 'execute', text: 'Started ping audit. Found 3 unverified numbers. Need your decision: retry automatically or flag for manual review?' });
+    logs.push({ role: 'system', phase: 'execute', text: '⚡ Blocked — awaiting input' });
+  } else {
+    const ent = state.entities[agent.entity];
+    logs.push({ role: 'system', phase: 'plan', text: 'Dispatched to ' + (ent ? ent.name : agent.entity) });
+    logs.push({ role: 'agent',  phase: 'plan', text: 'Task: ' + agent.label + '. Scanning files & planning approach.' });
+    logs.push({ role: 'agent',  phase: 'execute', text: 'Running. Touching relevant files in the constellation.' });
+  }
+
+  state.agentLogs[agent.id] = logs;
+}
+
+function openChat(agent) {
+  ensureAgentLog(agent);
+  const panel = document.getElementById('chatPanel');
+  const avatar = document.getElementById('chatAvatar');
+  const name = document.getElementById('chatName');
+  const sub = document.getElementById('chatSub');
+
+  avatar.className = 'chat-avatar ' +
+    (agent.primary ? 'primary' : agent.state === 'needs-input' ? 'needs-input' : 'working');
+  name.textContent = agent.name + (agent.primary ? ' · you' : '');
+  const ent = state.entities[agent.entity];
+  sub.textContent = (ent ? ent.name.toUpperCase() : '—') + '  ·  ' + agent.label;
+
+  renderPhaseRibbon(agent);
+  renderLog(agent);
+
+  panel.classList.add('open');
+}
+
+function closeChat() {
+  document.getElementById('chatPanel').classList.remove('open');
+  state.selectedAgent = null;
+}
+
+function renderPhaseRibbon(agent) {
+  const phase = state.agentPhase[agent.id] || 'execute';
+  const order = ['plan', 'execute', 'review'];
+  const activeIdx = order.indexOf(phase);
+  document.querySelectorAll('#chatPanel .phase-pip').forEach(pip => {
+    const p = pip.dataset.phase;
+    const pi = order.indexOf(p);
+    pip.classList.remove('active', 'done');
+    if (pi < activeIdx) pip.classList.add('done');
+    else if (pi === activeIdx) pip.classList.add('active');
+  });
+}
+
+function renderLog(agent) {
+  const log = state.agentLogs[agent.id] || [];
+  const container = document.getElementById('chatLog');
+  container.innerHTML = '';
+  log.forEach(entry => {
+    const el = document.createElement('div');
+    el.className = 'log-entry ' + entry.role;
+    if (entry.role === 'system') {
+      el.innerHTML = `<div class="log-body">${escapeHtml(entry.text)}</div>`;
+    } else {
+      const who = entry.role === 'user' ? 'YOU' : agent.name.toUpperCase();
+      el.innerHTML = `
+        <div class="log-meta"><span class="phase-tag">${entry.phase.toUpperCase()}</span>${who}</div>
+        <div class="log-body">${escapeHtml(entry.text)}</div>
+      `;
+    }
+    container.appendChild(el);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function appendLog(agent, entry) {
+  state.agentLogs[agent.id].push(entry);
+  renderLog(agent);
+}
+
+document.getElementById('chatClose').addEventListener('click', () => {
+  closeChat();
+  state.selectedAgent = null;
+});
+
+document.getElementById('chatSend').addEventListener('click', () => sendChatMessage());
+document.getElementById('chatInput').addEventListener('keydown', (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') sendChatMessage();
+});
+
+function sendChatMessage() {
+  const agent = state.selectedAgent;
+  if (!agent) return;
+  const text = document.getElementById('chatInput').value.trim();
+  if (!text) return;
+  const phase = state.agentPhase[agent.id] || 'execute';
+  appendLog(agent, { role: 'user', phase, text });
+  document.getElementById('chatInput').value = '';
+
+  // Mocked agent response
+  setTimeout(() => {
+    if (state.selectedAgent !== agent) return;
+    const replies = [
+      'Got it. Adjusting approach.',
+      'Understood. Re-planning with that constraint.',
+      'Noted — continuing with that focus.',
+      'Re-running with the change in scope.',
+      'Clear. Will check and report back.',
+    ];
+    const reply = replies[Math.floor(Math.random() * replies.length)];
+    appendLog(agent, { role: 'agent', phase, text: reply });
+  }, 800);
+}
+
+document.getElementById('chatInterrupt').addEventListener('click', () => {
+  const agent = state.selectedAgent;
+  if (!agent) return;
+  agent.state = 'idle';
+  appendLog(agent, { role: 'system', phase: state.agentPhase[agent.id] || 'execute', text: 'Interrupted by you. Agent paused.' });
+});
+
+document.getElementById('chatFresh').addEventListener('click', () => {
+  const agent = state.selectedAgent;
+  if (!agent) return;
+  state.agentLogs[agent.id] = [
+    { role: 'system', phase: 'plan', text: 'Context cleared · fresh session' },
+    { role: 'agent', phase: 'plan', text: 'Fresh start. Task: ' + agent.label + '. Re-planning.' },
+  ];
+  state.agentPhase[agent.id] = 'plan';
+  renderPhaseRibbon(agent);
+  renderLog(agent);
+});
+
+// ---------- Dispatch modal ----------
+const PHASE_HINTS = {
+  plan:    'sketch the approach, stop for your review',
+  execute: 'run once, stop when done',
+  ralph:   'iterate in a loop until done — self-corrects',
+};
+let dispatchEntity = null;
+let dispatchPhase = 'execute';
+
+function openDispatch(eid) {
+  dispatchEntity = eid;
+  const ent = state.entities[eid];
+  document.getElementById('dispatchTarget').textContent = ent.name;
+  document.getElementById('dispatchInput').value = '';
+  document.getElementById('dispatchModal').classList.add('open');
+  document.getElementById('dispatchScrim').classList.add('open');
+  setTimeout(() => document.getElementById('dispatchInput').focus(), 100);
+}
+
+function closeDispatch() {
+  document.getElementById('dispatchModal').classList.remove('open');
+  document.getElementById('dispatchScrim').classList.remove('open');
+  dispatchEntity = null;
+}
+
+document.getElementById('dispatchClose').addEventListener('click', closeDispatch);
+document.getElementById('dispatchScrim').addEventListener('click', closeDispatch);
+
+document.getElementById('phaseGroup').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#phaseGroup button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  dispatchPhase = btn.dataset.phase;
+  document.getElementById('phaseHint').textContent = PHASE_HINTS[dispatchPhase];
+});
+
+document.getElementById('dispatchInput').addEventListener('keydown', (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') submitDispatch();
+  if (ev.key === 'Escape') closeDispatch();
+});
+
+document.getElementById('dispatchSubmit').addEventListener('click', submitDispatch);
+
+function submitDispatch() {
+  const input = document.getElementById('dispatchInput').value.trim();
+  if (!input || !dispatchEntity) return;
+  const eid = dispatchEntity;
+  const ent = state.entities[eid];
+  const label = input.length > 32 ? input.slice(0, 30) + '…' : input;
+  const usedNames = new Set(state.agents.map(a => a.name));
+  const freeNames = AGENT_NAMES.filter(n => !usedNames.has(n));
+  const name = freeNames.length ? freeNames[Math.floor(Math.random() * freeNames.length)] : 'Agent' + state.agents.length;
+  const target = ent.nodeIds[Math.floor(Math.random() * ent.nodeIds.length)];
+  const tn = state.nodes[target];
+  const newAgent = {
+    id: 'ag-' + Date.now(),
+    name,
+    label,
+    state: 'working',
+    entity: eid,
+    phase: dispatchPhase,
+    primary: false,
+    x: tn.x, y: tn.y,
+    targetNode: target,
+    prevNode: target,
+    t: 0,
+    speed: 0.004 + Math.random() * 0.003,
+  };
+  state.agents.push(newAgent);
+  // Seed a chat log with the actual instruction
+  const startPhase = dispatchPhase === 'ralph' ? 'plan' : dispatchPhase;
+  state.agentPhase[newAgent.id] = startPhase;
+  state.agentLogs[newAgent.id] = [
+    { role: 'system', phase: startPhase, text: 'Dispatched to ' + ent.name + ' · mode: ' + dispatchPhase.toUpperCase() },
+    { role: 'user',   phase: startPhase, text: input },
+    { role: 'agent',  phase: startPhase, text: dispatchPhase === 'plan'
+        ? 'Received. Sketching the approach before touching anything.'
+        : dispatchPhase === 'ralph'
+        ? 'Received. Ralph loop: planning, then iterating execute → review until done.'
+        : 'Received. Going to execute.' },
+  ];
+  closeDispatch();
+  flashToast('dispatched ' + name + ' · ' + ent.name + ' · ' + dispatchPhase);
+  focusEntity(eid, Math.max(state.cam.targetScale, 1.1));
+}
+
+// Alert badge -> jump to CPA
+document.getElementById('alertBadge').addEventListener('click', () => {
+  focusEntity('cpa', 1.3);
+  selectEntity('cpa');
+  flashToast('blocker · toll-free verify');
+});
+
+// ---------- Agent tooltip ----------
+function updateAgentTip(agent, clientX, clientY) {
+  const tip = document.getElementById('agentTip');
+  if (!agent) { tip.classList.remove('show'); return; }
+  document.getElementById('agentTipName').textContent = agent.name;
+  const lbl = agent.state === 'needs-input' ? agent.label + ' · needs input' : agent.label;
+  document.getElementById('agentTipLabel').textContent = lbl;
+  tip.style.left = clientX + 'px';
+  tip.style.top  = clientY + 'px';
+  tip.classList.add('show');
+}
+
+// ---------- Toast ----------
+let toastT = null;
+function flashToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerHTML = '<span class="acc">&rarr;</span> ' + msg;
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+// ---------- Resource mocks (mini bars) ----------
+function updateMiniBars() {
+  const ctxPct = Math.min(100, (state.ctxUsed / state.ctxMax) * 100);
+  const cb = document.getElementById('ctxBar');
+  cb.querySelector('.fill').style.width = ctxPct + '%';
+  cb.classList.toggle('warn', ctxPct > 70);
+  cb.classList.toggle('crit', ctxPct > 90);
+  document.getElementById('ctxTip').textContent = Math.round(state.ctxUsed / 1000) + 'k / ' + (state.ctxMax / 1000) + 'k';
+
+  const spendPct = Math.min(100, (state.spend / 5) * 100);
+  const sb = document.getElementById('spendBar');
+  sb.querySelector('.fill').style.width = spendPct + '%';
+  sb.classList.toggle('warn', state.spend > 1.5);
+  sb.classList.toggle('crit', state.spend > 3.5);
+  document.getElementById('spendTip').textContent = '$' + state.spend.toFixed(2) + ' today';
+
+  const mb = document.getElementById('memBar');
+  mb.querySelector('.fill').style.width = state.memPct + '%';
+  mb.classList.toggle('warn', state.memPct > 70);
+  mb.classList.toggle('crit', state.memPct > 90);
+  document.getElementById('memTip').textContent = state.memPct + '% of working set';
+}
+
+// Periodically drift resources
+setInterval(() => {
+  state.ctxUsed = Math.max(10000, Math.min(195000, state.ctxUsed + (Math.random() - 0.4) * 3000));
+  state.spend  += Math.random() * 0.04;
+  state.memPct = Math.max(20, Math.min(92, state.memPct + (Math.random() - 0.5) * 2));
+  updateMiniBars();
+}, 2400);
+
+// ---------- Init ----------
+function init() {
+  sizeCanvases();
+  seedConstellations();
+  seedAgents();
+  buildBaseNav();
+  // Default view: CPA centered, scale 1
+  state.cam.x = 0; state.cam.y = 0; state.cam.scale = 1;
+  state.cam.targetX = 0; state.cam.targetY = 0; state.cam.targetScale = 1;
+  updateMiniBars();
+  updateZoomLabel();
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize', () => {
+  sizeCanvases();
+});
+
+init();
+</script>
+
+</body>
+</html>
