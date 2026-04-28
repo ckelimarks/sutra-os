@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Mockup</title>
+<style>
+  :root {
+    --bg-primary: #0a0a0c;
+    --bg-secondary: #131318;
+    --bg-tertiary: #1a1a22;
+    --bg-hover: #22222e;
+    --border: #2a2a38;
+    --text-primary: #e8e8ed;
+    --text-secondary: #9090a0;
+    --text-muted: #606070;
+    --accent: #7c6bf0;
+    --accent-dim: #7c6bf020;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* === SIDEBAR === */
+  .sidebar {
+    width: 56px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-home {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.5px;
+  }
+
+  .sidebar-divider {
+    width: 24px;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  .agent-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+
+  .agent-dot:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .agent-dot.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  .agent-dot .status-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-secondary);
+  }
+
+  .status-indicator.online { background: var(--green); }
+  .status-indicator.busy { background: var(--yellow); }
+  .status-indicator.error { background: var(--red); }
+  .status-indicator.offline { background: var(--text-muted); }
+
+  .agent-dot .cost-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 8px;
+    padding: 1px 4px;
+    color: var(--text-muted);
+    display: none;
+  }
+
+  .agent-dot:hover .cost-badge { display: block; }
+
+  .sidebar-bottom {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 8px;
+  }
+
+  .sidebar-cost {
+    font-size: 9px;
+    color: var(--text-muted);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    letter-spacing: 0.5px;
+  }
+
+  /* === MAIN AREA === */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* === CONVERSATION === */
+  .conversation {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .message-group {
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .message {
+    padding: 12px 0;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  .message-user {
+    color: var(--text-primary);
+  }
+
+  .message-user .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .message-assistant {
+    color: var(--text-primary);
+  }
+
+  .message-assistant .label {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .message-assistant .label .agent-badge {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 8px;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .message-assistant .label .cost {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .message-assistant .label .model-tag {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  .message-content {
+    white-space: pre-wrap;
+  }
+
+  .message-content code {
+    background: var(--bg-tertiary);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* === STATUS BAR === */
+  .status-bar {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 6px 24px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-item .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* === INPUT === */
+  .input-area {
+    padding: 12px 24px 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .input-container {
+    max-width: 720px;
+    width: 100%;
+    position: relative;
+  }
+
+  .input-bar {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 56px 14px 20px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    resize: none;
+    line-height: 1.5;
+    min-height: 48px;
+    max-height: 160px;
+    transition: border-color 0.2s;
+  }
+
+  .input-bar::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-bar:focus {
+    border-color: var(--accent);
+  }
+
+  .send-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s;
+  }
+
+  .send-btn:hover { opacity: 0.85; }
+
+  .send-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: white;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* === DIRECT CHAT HEADER === */
+  .direct-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .direct-header.visible { display: flex; }
+
+  .direct-header .back-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .direct-header .agent-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .direct-header .agent-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* === AGENT DETAIL PANEL (hover/click on sidebar dot) === */
+  .agent-tooltip {
+    display: none;
+    position: fixed;
+    left: 64px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    width: 220px;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .agent-tooltip.visible { display: block; }
+
+  .agent-tooltip h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .agent-tooltip .meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .agent-tooltip .meta span {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .agent-tooltip .actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+  }
+
+  .agent-tooltip .actions button {
+    flex: 1;
+    padding: 5px 0;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .agent-tooltip .actions button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .agent-tooltip .actions button.primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* === SCROLLBAR === */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-home" onclick="showSutra()" title="Sutra">S</div>
+  <div class="sidebar-divider"></div>
+
+  <div class="agent-dot" onclick="showAgentTooltip(this, 'LoveNotes', 'busy', 'opus', '$0.42', '14 couples, 2 stale responses')" title="LoveNotes">
+    LN
+    <div class="status-indicator busy"></div>
+    <div class="cost-badge">$0.42</div>
+  </div>
+
+  <div class="agent-dot" onclick="showAgentTooltip(this, 'ContentWriter', 'online', 'sonnet', '$0.08', 'Idle')" title="ContentWriter">
+    CW
+    <div class="status-indicator online"></div>
+    <div class="cost-badge">$0.08</div>
+  </div>
+
+  <div class="agent-dot" onclick="showAgentTooltip(this, 'Zeitgeist', 'online', 'opus', '$0.15', 'Idle')" title="Zeitgeist">
+    ZG
+    <div class="status-indicator online"></div>
+    <div class="cost-badge">$0.15</div>
+  </div>
+
+  <div class="agent-dot" onclick="showAgentTooltip(this, 'Prototypes', 'online', 'sonnet', '$0.03', 'Idle')" title="Prototypes">
+    PT
+    <div class="status-indicator online"></div>
+    <div class="cost-badge">$0.03</div>
+  </div>
+
+  <div class="agent-dot" onclick="showAgentTooltip(this, 'Local (qwen)', 'online', 'qwen2.5:7b', '$0.00', 'Idle')" title="Local">
+    QW
+    <div class="status-indicator online"></div>
+    <div class="cost-badge">$0</div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-cost">$0.68 today</div>
+  </div>
+</div>
+
+<!-- AGENT TOOLTIP -->
+<div class="agent-tooltip" id="agentTooltip">
+  <h3 id="tooltipName"></h3>
+  <div class="meta">
+    <span>Status <b id="tooltipStatus"></b></span>
+    <span>Model <b id="tooltipModel"></b></span>
+    <span>Cost <b id="tooltipCost"></b></span>
+    <span>Last <b id="tooltipLast"></b></span>
+  </div>
+  <div class="actions">
+    <button onclick="openDirectChat()" class="primary">Direct chat</button>
+    <button onclick="hideTooltip()">Dismiss</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- Direct chat header (hidden by default) -->
+  <div class="direct-header" id="directHeader">
+    <button class="back-btn" onclick="showSutra()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      Sutra
+    </button>
+    <span class="agent-name" id="directAgentName"></span>
+    <span class="agent-meta" id="directAgentMeta"></span>
+  </div>
+
+  <!-- Conversation -->
+  <div class="conversation" id="conversation">
+
+    <div class="message-group">
+      <div class="message message-user">
+        <div class="label">Christopher</div>
+        <div class="message-content">check lovenotes health</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-assistant">
+        <div class="label">
+          Sutra
+          <span class="agent-badge">LoveNotes</span>
+          <span class="model-tag">opus</span>
+          <span class="cost">$0.034</span>
+        </div>
+        <div class="message-content">14 couples active (5 paid). 2 partners have stale responses (>48hrs): Sarah K. (couple #7) and Mike R. (couple #12). No delivery failures. Trial conversion still at 0/11 — v4.2 curriculum not yet deployed.
+
+Next action: ping stale partners or deploy v4.2?</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-user">
+        <div class="label">Christopher</div>
+        <div class="message-content">draft a linkedin post about the geoint skill I built</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-assistant">
+        <div class="label">
+          Sutra
+          <span class="agent-badge">ContentWriter</span>
+          <span class="model-tag">sonnet</span>
+          <span class="cost">$0.012</span>
+        </div>
+        <div class="message-content">I built a personal intelligence briefing system this weekend.
+
+19 RSS feeds from defense, geopolitics, and climate sources. A haiku-class model fetches and filters (cheap). An opus-class model analyzes and synthesizes (expensive, but only runs on the filtered set).
+
+The result: a password-protected dashboard with a world map, hotspot tracking, and actionable prep recommendations. Updated daily.
+
+Why? Because "what's happening in the world" shouldn't require doomscrolling. It should be a structured briefing that respects your attention.
+
+The cost pattern — cheap models for ingestion, expensive models for analysis — works everywhere. Most of what AI does is plumbing. Save the intelligence for the last mile.</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-user">
+        <div class="label">Christopher</div>
+        <div class="message-content">what did we decide about the auth middleware last week?</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-assistant">
+        <div class="label">
+          Sutra
+          <span class="agent-badge">Continuum</span>
+          <span class="model-tag">haiku</span>
+          <span class="cost">$0.002</span>
+        </div>
+        <div class="message-content">From your March 28 session: decided to keep the existing JWT middleware but add refresh token rotation. The old session-cookie approach was flagged by legal for compliance. You committed the plan but haven't started implementation — it's in TASKS.md as P2.</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-user">
+        <div class="label">Christopher</div>
+        <div class="message-content">status</div>
+      </div>
+    </div>
+
+    <div class="message-group">
+      <div class="message message-assistant">
+        <div class="label">
+          Sutra
+          <span class="model-tag">sonnet</span>
+          <span class="cost">$0.008</span>
+        </div>
+        <div class="message-content">5 agents, 1 working, 4 idle. $0.68 today.
+
+LoveNotes is running a health check (started 2 min ago).
+No blockers. No pending approvals.
+ContentWriter finished the GEOINT post draft — ready for your review.
+
+Nothing urgent.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="dot" style="background:var(--green)"></div>
+      5 agents
+    </div>
+    <div class="status-item">
+      <div class="dot" style="background:var(--yellow)"></div>
+      1 working
+    </div>
+    <div class="status-item">$0.68 today</div>
+    <div class="status-item">Last report: ContentWriter — GEOINT draft complete</div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-container">
+      <textarea class="input-bar" placeholder="Talk to Sutra..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentTooltipAgent = null;
+
+  function showSutra() {
+    document.getElementById('directHeader').classList.remove('visible');
+    document.querySelectorAll('.agent-dot').forEach(d => d.classList.remove('active'));
+    hideTooltip();
+    // Show sutra conversation
+    document.getElementById('conversation').style.display = '';
+    document.querySelector('.input-bar').placeholder = 'Talk to Sutra...';
+  }
+
+  function showAgentTooltip(el, name, status, model, cost, last) {
+    const tooltip = document.getElementById('agentTooltip');
+    const rect = el.getBoundingClientRect();
+    tooltip.style.top = rect.top + 'px';
+    document.getElementById('tooltipName').textContent = name;
+    document.getElementById('tooltipStatus').textContent = status;
+    document.getElementById('tooltipModel').textContent = model;
+    document.getElementById('tooltipCost').textContent = cost;
+    document.getElementById('tooltipLast').textContent = last;
+    tooltip.classList.add('visible');
+    currentTooltipAgent = name;
+
+    document.querySelectorAll('.agent-dot').forEach(d => d.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function hideTooltip() {
+    document.getElementById('agentTooltip').classList.remove('visible');
+  }
+
+  function openDirectChat() {
+    hideTooltip();
+    const header = document.getElementById('directHeader');
+    header.classList.add('visible');
+    document.getElementById('directAgentName').textContent = currentTooltipAgent;
+    document.getElementById('directAgentMeta').textContent = 'Direct chat';
+    document.querySelector('.input-bar').placeholder = `Message ${currentTooltipAgent} directly...`;
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      // Would send message
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = '';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }
+
+  // Close tooltip on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.agent-dot') && !e.target.closest('.agent-tooltip')) {
+      hideTooltip();
+    }
+  });
+</script>
+
+</body>
+</html>

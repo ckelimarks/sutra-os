@@ -44,40 +44,40 @@ def init_db():
     _run_migrations()
 
 
-def _alter_add(conn, sql):
-    """Idempotent ALTER TABLE … ADD COLUMN.
-
-    init_db() runs in two processes on startup (bridge.py + ws_server.py).
-    Without this guard, a column-existence check at the top of the function
-    can be stale by the time we ALTER, and the second process raises
-    `sqlite3.OperationalError: duplicate column name: …`. Swallowing only
-    that specific error keeps the migration safe to run concurrently.
-    """
-    try:
-        conn.execute(sql)
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" not in str(e).lower():
-            raise
-
-
 def _run_migrations():
-    """Run database migrations for existing databases.
-
-    All ALTER TABLE … ADD COLUMN statements go through `_alter_add` so they
-    can be re-executed safely.
-    """
+    """Run database migrations for existing databases."""
     with get_connection() as conn:
-        # Agent columns
-        _alter_add(conn, "ALTER TABLE agents ADD COLUMN notification TEXT DEFAULT NULL")
-        _alter_add(conn, "ALTER TABLE agents ADD COLUMN permission_tier TEXT DEFAULT 'autonomous'")
+        # Check agent columns
+        cursor = conn.execute("PRAGMA table_info(agents)")
+        agent_cols = [row['name'] for row in cursor.fetchall()]
 
-        # Message columns
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN cost_usd REAL DEFAULT 0.0")
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN duration_secs REAL DEFAULT 0.0")
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN input_tokens INTEGER DEFAULT 0")
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN output_tokens INTEGER DEFAULT 0")
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN context_tokens INTEGER DEFAULT 0")
-        _alter_add(conn, "ALTER TABLE messages ADD COLUMN route_reason TEXT DEFAULT NULL")
+        if 'notification' not in agent_cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN notification TEXT DEFAULT NULL")
+
+        if 'permission_tier' not in agent_cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN permission_tier TEXT DEFAULT 'autonomous'")
+
+        # Check message columns
+        cursor = conn.execute("PRAGMA table_info(messages)")
+        msg_cols = [row['name'] for row in cursor.fetchall()]
+
+        if 'cost_usd' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN cost_usd REAL DEFAULT 0.0")
+
+        if 'duration_secs' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN duration_secs REAL DEFAULT 0.0")
+
+        if 'input_tokens' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN input_tokens INTEGER DEFAULT 0")
+
+        if 'output_tokens' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN output_tokens INTEGER DEFAULT 0")
+
+        if 'context_tokens' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN context_tokens INTEGER DEFAULT 0")
+
+        if 'route_reason' not in msg_cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN route_reason TEXT DEFAULT NULL")
 
         # Create session_registry if it doesn't exist
         conn.execute("""
@@ -100,8 +100,11 @@ def _run_migrations():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_session_registry_cwd ON session_registry(cwd)")
 
         # Add tags and last_session_summary to agents (for neural-net visualization)
-        _alter_add(conn, "ALTER TABLE agents ADD COLUMN tags TEXT DEFAULT '[]'")
-        _alter_add(conn, "ALTER TABLE agents ADD COLUMN last_session_summary TEXT DEFAULT NULL")
+        if 'tags' not in agent_cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN tags TEXT DEFAULT '[]'")
+
+        if 'last_session_summary' not in agent_cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN last_session_summary TEXT DEFAULT NULL")
 
         # Create events table (REQ-1.1.1)
         conn.execute("""

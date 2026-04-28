@@ -20,8 +20,8 @@
     --accent-soft: rgba(217, 138, 60, 0.18);
     --ok: #6b8e4e;
 
-    --cpa: #c8d5c9;
-    --cpa-ink: #4e6b50;
+    --lovenotes: #c8d5c9;
+    --lovenotes-ink: #4e6b50;
     --hg: #d9cdb8;
     --hg-ink: #7a6a4d;
     --content: #c9d0d9;
@@ -496,7 +496,7 @@
     <span class="deploy-label">Dispatch</span>
     <input type="text" id="task-input" placeholder="e.g. review PR #482, draft Q2 OKRs, book dentist appt" />
     <div class="room-select" id="room-select">
-      <button class="room-chip active" data-room="cpa">CPA</button>
+      <button class="room-chip active" data-room="lovenotes">LoveNotes</button>
       <button class="room-chip" data-room="hg">HG</button>
       <button class="room-chip" data-room="content">Content</button>
       <button class="room-chip" data-room="life">Life</button>
@@ -514,20 +514,20 @@ const W = 1000, H = 620;
 
 /* Floor plan: four rooms around a central corridor.
    Rooms:
-     CPA: top-left
+     LoveNotes: top-left
      HG:        top-right
      Content:   bottom-left
      Life:      bottom-right
    Common area: center horizontal corridor. */
 
 const ROOMS = {
-  cpa: {
-    id: 'cpa',
-    name: 'CPA',
+  lovenotes: {
+    id: 'lovenotes',
+    name: 'LoveNotes',
     sub: 'AI SMS · product',
     rect: { x: 40,  y: 40,  w: 400, h: 230 },
-    tint: 'var(--cpa)',
-    ink:  'var(--cpa-ink)',
+    tint: 'var(--lovenotes)',
+    ink:  'var(--lovenotes-ink)',
     door: { x: 240, y: 270 },           // doorway center (opens to corridor)
     desks: [
       { id: 'ln-a', x: 150, y: 130 },
@@ -604,7 +604,7 @@ const AGENTS = [
 
 /* Realistic seeded task pool */
 const TASK_POOL = {
-  cpa: [
+  lovenotes: [
     'review PR #482 — retry queue',
     'triage Sentry spike in send-sms',
     'write migration for messages.sent_at',
@@ -647,7 +647,7 @@ const state = {
   selection: null,  // { type: 'room'|'agent'|'desk', id }
   completedToday: 14,
   streak: '9d',
-  selectedRoom: 'cpa',
+  selectedRoom: 'lovenotes',
 };
 
 /* Build desk index */
@@ -812,7 +812,7 @@ function drawWalls() {
     // Top wall
     el('line', { x1: r.x, y1: r.y, x2: r.x + r.w, y2: r.y, class: 'wall' }, gWalls);
     // Bottom wall (may have doorway if room is on top side of corridor)
-    const bottomIsDoor = r.y + r.h === 270; // CPA/HG
+    const bottomIsDoor = r.y + r.h === 270; // LoveNotes/HG
     if (bottomIsDoor) {
       el('line', { x1: r.x, y1: r.y + r.h, x2: room.door.x - doorGap/2, y2: r.y + r.h, class: 'wall' }, gWalls);
       el('line', { x1: room.door.x + doorGap/2, y1: r.y + r.h, x2: r.x + r.w, y2: r.y + r.h, class: 'wall' }, gWalls);
@@ -949,7 +949,7 @@ function renderChips() {
 
     // Chip stack beside doorway, offset into the corridor
     const door = room.door;
-    const onTopSide = door.y === 270; // CPA/HG — chips go below door into corridor
+    const onTopSide = door.y === 270; // LoveNotes/HG — chips go below door into corridor
     const dir = onTopSide ? 1 : -1;
 
     q.slice(0, 3).forEach((t, i) => {
@@ -1429,9 +1429,9 @@ function seed() {
     });
   });
 
-  // A1 (Ada) — working in CPA, ~40%
+  // A1 (Ada) — working in LoveNotes, ~40%
   const adaDesk = 'ln-a';
-  const adaTask = { id: 't-seed-1', title: 'review PR #482 — retry queue', roomId: 'cpa' };
+  const adaTask = { id: 't-seed-1', title: 'review PR #482 — retry queue', roomId: 'lovenotes' };
   Object.assign(state.desks[adaDesk], { agentId: 'a1', task: adaTask, progress: 0.40 });
   const ada = state.agents['a1'];
   ada.mode = 'working';
@@ -1496,9 +1496,9 @@ function seed() {
   soren.pos = { ...COMMON.restPoints[4] };
 
   // Pending chips at doorways
-  state.rooms.cpa.queue.push(
-    { id: 't-seed-q1', title: 'triage Sentry spike', roomId: 'cpa' },
-    { id: 't-seed-q2', title: 'QA new tone picker on staging', roomId: 'cpa' },
+  state.rooms.lovenotes.queue.push(
+    { id: 't-seed-q1', title: 'triage Sentry spike', roomId: 'lovenotes' },
+    { id: 't-seed-q2', title: 'QA new tone picker on staging', roomId: 'lovenotes' },
   );
   state.rooms.life.queue.push(
     { id: 't-seed-q3', title: 'book dentist appt', roomId: 'life' },

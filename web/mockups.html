@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra UI Explorations</title>
+<style>
+  :root {
+    --bg: #08080c;
+    --card: #111118;
+    --card-hover: #181822;
+    --border: #2a2a38;
+    --text: #e8e8ed;
+    --text-dim: #8888a0;
+    --text-muted: #555566;
+    --accent: #7c6bf0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 48px 32px;
+  }
+
+  header {
+    max-width: 960px;
+    margin: 0 auto 48px;
+    text-align: center;
+  }
+
+  header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .grid {
+    max-width: 960px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card:hover {
+    background: var(--card-hover);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(124, 107, 240, 0.08);
+  }
+
+  .card-letter {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  .card-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+  }
+
+  .tag {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-muted);
+  }
+
+  .card.highlight {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, var(--card) 0%, rgba(124,107,240,0.04) 100%);
+  }
+
+  .card.highlight .card-subtitle { color: var(--accent); }
+
+  .section-label {
+    max-width: 960px;
+    margin: 40px auto 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+  }
+
+  footer {
+    max-width: 960px;
+    margin: 48px auto 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sutra <span>UI Explorations</span></h1>
+  <p>8 design directions for a single-orchestrator interface. Each mockup is a self-contained HTML file with mock data and interactions.</p>
+</header>
+
+<div class="section-label">Round 1 — Initial Explorations</div>
+
+<div class="grid">
+  <a class="card" href="mockup.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#6366f1;">0</div>
+      <div>
+        <div class="card-title">Sidebar + Chat</div>
+        <div class="card-subtitle">Original</div>
+      </div>
+    </div>
+    <div class="card-desc">Slack-inspired layout. Agent sidebar with status dots, central Sutra conversation, agent badges on responses. The starting point.</div>
+    <div class="card-tags">
+      <span class="tag">sidebar</span>
+      <span class="tag">agent dots</span>
+      <span class="tag">tooltip drill-down</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-a.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#8b5cf6;">A</div>
+      <div>
+        <div class="card-title">Ambient OS</div>
+        <div class="card-subtitle">Spotlight meets HUD</div>
+      </div>
+    </div>
+    <div class="card-desc">Barely-there UI. Centered floating input like Spotlight. Responses fade after reading. Agent status as subtle edge-of-screen dots. The interface breathes.</div>
+    <div class="card-tags">
+      <span class="tag">minimal</span>
+      <span class="tag">fading history</span>
+      <span class="tag">breathing glow</span>
+      <span class="tag">edge dots</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-b.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#059669;">B</div>
+      <div>
+        <div class="card-title">Terminal Zen</div>
+        <div class="card-subtitle">Pure command line</div>
+      </div>
+    </div>
+    <div class="card-desc">Monospace everything. sutra > prompt. Colored left-borders per agent. Tab completion with @. CRT grid texture. Every character earns its place.</div>
+    <div class="card-tags">
+      <span class="tag">terminal</span>
+      <span class="tag">monospace</span>
+      <span class="tag">@tab-complete</span>
+      <span class="tag">CRT aesthetic</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-c.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#0891b2;">C</div>
+      <div>
+        <div class="card-title">Thread River</div>
+        <div class="card-subtitle">Flowing card stream</div>
+      </div>
+    </div>
+    <div class="card-desc">Cards flow down a central spine. Agent responses branch as tributaries with colored thread lines. Auto-collapse after 30s. Agent presence circles on the right edge.</div>
+    <div class="card-tags">
+      <span class="tag">cards</span>
+      <span class="tag">auto-collapse</span>
+      <span class="tag">agent circles</span>
+      <span class="tag">hover highlight</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-label">Round 2 — Scale + Interaction</div>
+
+<div class="grid">
+  <a class="card" href="mockup-d.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#d946ef;">D</div>
+      <div>
+        <div class="card-title">Orbital</div>
+        <div class="card-subtitle">Solar system dashboard</div>
+      </div>
+    </div>
+    <div class="card-desc">Agents orbit Sutra at the top. Active agents closer, idle agents drift outward. Animated dispatch lines. Collapsible to thin strip. 8 agents.</div>
+    <div class="card-tags">
+      <span class="tag">radial layout</span>
+      <span class="tag">orbit animation</span>
+      <span class="tag">file chips</span>
+      <span class="tag">follow-up</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-e.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#f59e0b;">E</div>
+      <div>
+        <div class="card-title">Stream Columns</div>
+        <div class="card-subtitle">Bloomberg-style multi-stream</div>
+      </div>
+    </div>
+    <div class="card-desc">Sutra conversation center, agent activity streams flanking both sides. 10 agents across two rails. Most active closest to center. Expand cards inline.</div>
+    <div class="card-tags">
+      <span class="tag">3-column</span>
+      <span class="tag">10 agents</span>
+      <span class="tag">reply targeting</span>
+      <span class="tag">route animation</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-f.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#3b82f6;">F</div>
+      <div>
+        <div class="card-title">Depth Layers</div>
+        <div class="card-subtitle">Frosted glass depth</div>
+      </div>
+    </div>
+    <div class="card-desc">Sutra in front, agent grid behind at 40% opacity with blur. Double-click to pull an agent forward. Parallax on mouse move. See everything without switching.</div>
+    <div class="card-tags">
+      <span class="tag">backdrop-filter</span>
+      <span class="tag">parallax</span>
+      <span class="tag">z-depth</span>
+      <span class="tag">8 agents</span>
+    </div>
+  </a>
+
+  <a class="card highlight" href="mockup-g.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:var(--accent);">G</div>
+      <div>
+        <div class="card-title">Thread River Enhanced</div>
+        <div class="card-subtitle">Best of everything</div>
+      </div>
+    </div>
+    <div class="card-desc">Thread River core + inline agent replies, file chips with open/reveal, cloud layout toggle for 10+ agents, thread grouping, animated routing, status bar.</div>
+    <div class="card-tags">
+      <span class="tag">inline reply</span>
+      <span class="tag">file chips</span>
+      <span class="tag">cloud toggle</span>
+      <span class="tag">thread groups</span>
+      <span class="tag">10 agents</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-label">Round 3 — Ultra Minimal, Full PRD Scope</div>
+
+<div class="grid">
+  <a class="card highlight" href="mockup-h.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#171717;border:1px solid #333;">H</div>
+      <div>
+        <div class="card-title">Breath</div>
+        <div class="card-subtitle">Void + cursor. Nothing else.</div>
+      </div>
+    </div>
+    <div class="card-desc">Dark void. No chrome. You type on emptiness, Sutra responds, it fades. Tab reveals agents. All 10 PRD scenarios: dispatch, status, routing, files, approvals, replies, monitoring, memory, report zoom, budget alerts. Dieter Rams minimal.</div>
+    <div class="card-tags">
+      <span class="tag">zero chrome</span>
+      <span class="tag">10 scenarios</span>
+      <span class="tag">keyboard-first</span>
+      <span class="tag">fade history</span>
+      <span class="tag">report zoom</span>
+      <span class="tag">approvals</span>
+    </div>
+  </a>
+
+  <a class="card highlight" href="mockup-i.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#171717;border:1px solid #333;">I</div>
+      <div>
+        <div class="card-title">Pulse</div>
+        <div class="card-subtitle">One thought at a time</div>
+      </div>
+    </div>
+    <div class="card-desc">Each response replaces the previous — a living document. Edge pulse rings show agent activity as colored ripples. All 11 scenarios including Ollama local routing. Typography-only hierarchy. A sheet of paper as your OS.</div>
+    <div class="card-tags">
+      <span class="tag">single response</span>
+      <span class="tag">edge pulses</span>
+      <span class="tag">11 scenarios</span>
+      <span class="tag">report zoom</span>
+      <span class="tag">approvals</span>
+      <span class="tag">ollama</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-label">Round 4 — The Definitive Direction</div>
+
+<div class="grid">
+  <a class="card highlight" href="mockup-k.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:var(--accent);">K</div>
+      <div>
+        <div class="card-title">River + Orbital + Attention Queue</div>
+        <div class="card-subtitle">Two-way relay, full PRD scope</div>
+      </div>
+    </div>
+    <div class="card-desc">Thread River conversation with orbital header and attention queue sidebar. Inbound agent completions flow into the stream. Priority-sorted queue (needs input > permission > completed > working). "While you were away" synthesis. 10 agents, 10 scenarios, file chips, inline replies, multi-computer support.</div>
+    <div class="card-tags">
+      <span class="tag">river + orbital</span>
+      <span class="tag">attention queue</span>
+      <span class="tag">inbound flow</span>
+      <span class="tag">10 scenarios</span>
+      <span class="tag">file chips</span>
+      <span class="tag">multi-machine</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-label">Round 5 — Temporal View</div>
+
+<div class="grid">
+  <a class="card" href="mockup-l.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#ec4899;">L</div>
+      <div>
+        <div class="card-title">DAW Timeline — Full</div>
+        <div class="card-subtitle">Information dense</div>
+      </div>
+    </div>
+    <div class="card-desc">Logic Pro meets Gantt chart. 10 agents, sparklines, transport controls, zoom, solo/focus. Rich but busy — shows everything at once.</div>
+    <div class="card-tags">
+      <span class="tag">10 agents</span>
+      <span class="tag">sparklines</span>
+      <span class="tag">transport</span>
+      <span class="tag">information dense</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-m.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#a78bfa;">M</div>
+      <div>
+        <div class="card-title">DAW Timeline — Minimal</div>
+        <div class="card-subtitle">First minimal pass</div>
+      </div>
+    </div>
+    <div class="card-desc">Sutra as a glowing "bus" row. 6 agents, generous whitespace. Inline drill-down to tool calls. Superseded by N.</div>
+    <div class="card-tags">
+      <span class="tag">sutra bus</span>
+      <span class="tag">minimal</span>
+      <span class="tag">6 agents</span>
+    </div>
+  </a>
+
+  <a class="card highlight" href="mockup-n.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:var(--accent);">N</div>
+      <div>
+        <div class="card-title">DAW Timeline — Refined</div>
+        <div class="card-subtitle">Base version (coral/amber/violet)</div>
+      </div>
+    </div>
+    <div class="card-desc">Time of day axis, vritti popup, context bars, attention pill, status overview ("type 'status'"), zoom slider. Logic Pro-style palette.</div>
+    <div class="card-tags">
+      <span class="tag">base palette</span>
+      <span class="tag">zoom</span>
+      <span class="tag">status card</span>
+      <span class="tag">context bars</span>
+      <span class="tag">attention pill</span>
+    </div>
+  </a>
+</div>
+
+<div class="section-label">Round 6 — Palette Variants (same UI as N)</div>
+
+<div class="grid">
+  <a class="card" href="mockup-n-warm.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#d97e4e;">N1</div>
+      <div>
+        <div class="card-title">Warm</div>
+        <div class="card-subtitle">Rose, rust, teal, amber</div>
+      </div>
+    </div>
+    <div class="card-desc">Muted warm tones matching your reference sidebar. Rose, rust orange, teal, amber, soft violet. Comfortable, earthy, low saturation.</div>
+    <div class="card-tags">
+      <span class="tag">rose</span>
+      <span class="tag">rust</span>
+      <span class="tag">teal</span>
+      <span class="tag">amber</span>
+    </div>
+  </a>
+
+  <a class="card" href="mockup-n-cool.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#6b8ecc;">N2</div>
+      <div>
+        <div class="card-title">Cool</div>
+        <div class="card-subtitle">Slate, indigo, cyan, lavender</div>
+      </div>
+    </div>
+    <div class="card-desc">Blues and violets dominant. Slate, indigo, cyan, lavender, sea green. Cooler and more tech-forward.</div>
+    <div class="card-tags">
+      <span class="tag">slate</span>
+      <span class="tag">indigo</span>
+      <span class="tag">cyan</span>
+      <span class="tag">lavender</span>
+    </div>
+  </a>
+
+</div>
+
+<div class="section-label">Prior Art</div>
+
+<div class="grid">
+  <a class="card" href="mockup-j-voice-beam.html">
+    <div class="card-top">
+      <div class="card-letter" style="background:#f43f5e;">J</div>
+      <div>
+        <div class="card-title">Voice Beam</div>
+        <div class="card-subtitle">Earlier prototype</div>
+      </div>
+    </div>
+    <div class="card-desc">Voice-first interface prototype. Brought into the collection for reference and cross-pollination with Sutra UI explorations.</div>
+    <div class="card-tags">
+      <span class="tag">voice</span>
+      <span class="tag">prior art</span>
+    </div>
+  </a>
+</div>
+
+<footer>
+  Sutra UI Explorations — April 2026 — Christopher Marks + Claude
+</footer>
+
+</body>
+</html>

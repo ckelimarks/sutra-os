@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Thread River</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg: #0e0e10;
+    --surface: #18181c;
+    --surface-hover: #1f1f24;
+    --border: #2a2a30;
+    --text: #d4d4d8;
+    --text-dim: #71717a;
+    --text-faint: #52525b;
+    --sutra: #a78bfa;
+    --sutra-glow: rgba(167,139,250,0.15);
+    --agent-lovenotes: #f472b6;
+    --agent-jobsearch: #38bdf8;
+    --agent-teaching: #34d399;
+    --agent-health: #fb923c;
+    --river-line: #27272a;
+    --collapse-speed: 0.4s;
+  }
+
+  html { font-size: 15px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+    line-height: 1.55;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 52px;
+    background: rgba(14,14,16,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .header-title span { color: var(--sutra); }
+
+  /* ── River container ── */
+  .river-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 72px 20px 120px;
+    position: relative;
+  }
+  .river {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+  }
+
+  /* Vertical river spine */
+  .river::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--river-line) 40px, var(--river-line) calc(100% - 40px), transparent);
+    pointer-events: none;
+  }
+
+  /* ── Cards ── */
+  .card {
+    position: relative;
+    padding: 16px 16px 16px 44px;
+    border-radius: 8px;
+    transition: background 0.2s, opacity 0.3s;
+    cursor: pointer;
+    animation: cardSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .card:hover { background: var(--surface); }
+
+  @keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* River dot on the spine */
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 22px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 2px solid var(--bg);
+    z-index: 2;
+    transition: background 0.2s;
+  }
+  .card:hover::before { background: var(--text-dim); }
+
+  /* User question */
+  .card-question {
+    font-size: 0.88rem;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  /* Answer */
+  .card-answer {
+    font-size: 0.93rem;
+    color: var(--text);
+    line-height: 1.6;
+    overflow: hidden;
+    transition: max-height var(--collapse-speed) cubic-bezier(0.16,1,0.3,1), opacity 0.3s;
+  }
+  .card-answer p { margin-bottom: 8px; }
+  .card-answer p:last-child { margin-bottom: 0; }
+
+  /* Collapsed state */
+  .card.collapsed .card-answer {
+    max-height: 1.6em;
+    opacity: 0.6;
+  }
+  .card.collapsed .card-answer::after {
+    content: '';
+    position: absolute;
+    bottom: 12px;
+    left: 44px;
+    right: 16px;
+    height: 28px;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+    pointer-events: none;
+  }
+  .card.collapsed:hover .card-answer { opacity: 0.85; }
+
+  /* ── Agent thread line ── */
+  .card.agent-routed {
+    margin-left: 20px;
+    padding-left: 36px;
+  }
+  .card.agent-routed::before {
+    left: 8px;
+  }
+
+  /* Thread connector line */
+  .card.agent-routed .thread-line {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  .card.agent-routed:hover .thread-line { opacity: 0.85; }
+
+  /* Agent label */
+  .agent-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    opacity: 0.7;
+  }
+  .agent-label .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Agent colors */
+  .agent-lovenotes .thread-line { background: var(--agent-lovenotes); }
+  .agent-lovenotes .agent-label .dot { background: var(--agent-lovenotes); }
+  .agent-lovenotes .agent-label { color: var(--agent-lovenotes); }
+  .agent-lovenotes::before { background: var(--agent-lovenotes) !important; }
+
+  .agent-jobsearch .thread-line { background: var(--agent-jobsearch); }
+  .agent-jobsearch .agent-label .dot { background: var(--agent-jobsearch); }
+  .agent-jobsearch .agent-label { color: var(--agent-jobsearch); }
+  .agent-jobsearch::before { background: var(--agent-jobsearch) !important; }
+
+  .agent-teaching .thread-line { background: var(--agent-teaching); }
+  .agent-teaching .agent-label .dot { background: var(--agent-teaching); }
+  .agent-teaching .agent-label { color: var(--agent-teaching); }
+  .agent-teaching::before { background: var(--agent-teaching) !important; }
+
+  .agent-health .thread-line { background: var(--agent-health); }
+  .agent-health .agent-label .dot { background: var(--agent-health); }
+  .agent-health .agent-label { color: var(--agent-health); }
+  .agent-health::before { background: var(--agent-health) !important; }
+
+  /* Highlight state when agent circle is hovered */
+  .card.agent-routed.agent-highlight .thread-line { opacity: 1; }
+  .card.agent-routed.agent-dimmed { opacity: 0.25; }
+  .card:not(.agent-routed).agent-dimmed { opacity: 0.25; }
+  .card.agent-dimmed { transition: opacity 0.3s; }
+
+  /* ── Timestamp ── */
+  .card-time {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .card:hover .card-time { opacity: 1; }
+
+  /* ── Agent Presence (right edge) ── */
+  .agent-presence {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 90;
+  }
+  .agent-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.3s;
+    border: 1.5px solid transparent;
+  }
+  .agent-circle:hover {
+    transform: scale(1.15);
+  }
+  .agent-circle::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  /* Pulse animation for active agents */
+  .agent-circle.active::after {
+    animation: agentPulse 2.5s ease-in-out infinite;
+  }
+  @keyframes agentPulse {
+    0%, 100% { opacity: 0; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.4); }
+  }
+
+  .agent-circle.c-lovenotes {
+    background: rgba(244,114,182,0.12);
+    color: var(--agent-lovenotes);
+    border-color: rgba(244,114,182,0.25);
+  }
+  .agent-circle.c-lovenotes::after { box-shadow: 0 0 12px var(--agent-lovenotes); }
+  .agent-circle.c-lovenotes:hover { box-shadow: 0 0 16px rgba(244,114,182,0.3); }
+
+  .agent-circle.c-jobsearch {
+    background: rgba(56,189,248,0.12);
+    color: var(--agent-jobsearch);
+    border-color: rgba(56,189,248,0.25);
+  }
+  .agent-circle.c-jobsearch::after { box-shadow: 0 0 12px var(--agent-jobsearch); }
+  .agent-circle.c-jobsearch:hover { box-shadow: 0 0 16px rgba(56,189,248,0.3); }
+
+  .agent-circle.c-teaching {
+    background: rgba(52,211,153,0.12);
+    color: var(--agent-teaching);
+    border-color: rgba(52,211,153,0.25);
+  }
+  .agent-circle.c-teaching::after { box-shadow: 0 0 12px var(--agent-teaching); }
+  .agent-circle.c-teaching:hover { box-shadow: 0 0 16px rgba(52,211,153,0.3); }
+
+  .agent-circle.c-health {
+    background: rgba(251,146,60,0.12);
+    color: var(--agent-health);
+    border-color: rgba(251,146,60,0.25);
+  }
+  .agent-circle.c-health::after { box-shadow: 0 0 12px var(--agent-health); }
+  .agent-circle.c-health:hover { box-shadow: 0 0 16px rgba(251,146,60,0.3); }
+
+  /* Agent tooltip */
+  .agent-circle .tooltip {
+    position: absolute;
+    right: 44px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    color: var(--text);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .agent-circle:hover .tooltip { opacity: 1; }
+
+  /* ── River Depth Indicator ── */
+  .river-depth {
+    position: fixed;
+    right: 12px;
+    top: 72px;
+    bottom: 120px;
+    width: 2px;
+    background: var(--river-line);
+    border-radius: 1px;
+    z-index: 80;
+    opacity: 0.4;
+  }
+  .river-depth-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to bottom, var(--sutra), transparent);
+    border-radius: 1px;
+    transition: height 0.3s ease;
+  }
+  .river-depth-thumb {
+    position: absolute;
+    left: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sutra);
+    transition: top 0.3s ease;
+    box-shadow: 0 0 6px var(--sutra-glow);
+  }
+
+  /* ── Input Bar ── */
+  .input-wrap {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 16px 20px 28px;
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
+    z-index: 100;
+  }
+  .input-bar {
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+  }
+  .input-field {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .input-field::placeholder {
+    color: var(--text-faint);
+  }
+  .input-field:focus {
+    border-color: rgba(167,139,250,0.4);
+    box-shadow: 0 0 0 3px var(--sutra-glow), 0 0 24px var(--sutra-glow);
+  }
+
+  /* Subtle idle glow */
+  .input-field:not(:focus) {
+    animation: idleGlow 4s ease-in-out infinite;
+  }
+  @keyframes idleGlow {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 12px var(--sutra-glow); }
+  }
+
+  /* Keyboard hints */
+  .input-hints {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    font-size: 0.68rem;
+    color: var(--text-faint);
+    opacity: 0;
+    transition: opacity 0.5s;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .input-hints.visible { opacity: 1; }
+  .input-hints kbd {
+    font-family: inherit;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 0.65rem;
+    margin-right: 3px;
+  }
+
+  /* ── Typing indicator ── */
+  .typing-indicator {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 16px 16px 44px;
+    position: relative;
+    font-size: 0.82rem;
+    color: var(--text-faint);
+  }
+  .typing-indicator.visible { display: flex; }
+  .typing-indicator .dots span {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    margin: 0 1px;
+    animation: typingDot 1.2s ease-in-out infinite;
+  }
+  .typing-indicator .dots span:nth-child(2) { animation-delay: 0.15s; }
+  .typing-indicator .dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typingDot {
+    0%, 60%, 100% { opacity: 0.2; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-3px); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .agent-presence { display: none; }
+    .river-depth { display: none; }
+    .river { max-width: 100%; }
+    .card.agent-routed { margin-left: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title"><span>sutra</span> / thread river</div>
+</div>
+
+<div class="river-wrap">
+  <div class="river" id="river">
+    <!-- Cards injected by JS -->
+  </div>
+</div>
+
+<!-- Agent Presence -->
+<div class="agent-presence" id="agentPresence"></div>
+
+<!-- River Depth -->
+<div class="river-depth" id="riverDepth">
+  <div class="river-depth-fill" id="riverDepthFill"></div>
+  <div class="river-depth-thumb" id="riverDepthThumb"></div>
+</div>
+
+<!-- Input -->
+<div class="input-wrap">
+  <div class="input-bar">
+    <div class="input-hints" id="inputHints">
+      <span><kbd>/</kbd> commands</span>
+      <span><kbd>@</kbd> agent</span>
+      <span>try: status, clarity, tell me more</span>
+    </div>
+    <input type="text" class="input-field" id="inputField" placeholder="Ask Sutra anything..." autocomplete="off">
+  </div>
+</div>
+
+<script>
+// ── Data ──
+const agents = [
+  { id: 'lovenotes', label: 'LoveNotes', short: 'LN', color: 'var(--agent-lovenotes)' },
+  { id: 'jobsearch', label: 'Job Search', short: 'JS', color: 'var(--agent-jobsearch)' },
+  { id: 'teaching',  label: 'Teaching',   short: 'TE', color: 'var(--agent-teaching)' },
+  { id: 'health',    label: 'Health',      short: 'HE', color: 'var(--agent-health)' },
+];
+
+const conversation = [
+  {
+    question: 'Good morning. What should I focus on today?',
+    answer: 'Three things for today. First: your LoveNotes trial conversion analysis is overdue — 0 of 11 converted and you have interview data waiting. Second: the Remington mid-semester grades close Friday, 315 students need final review. Third: you mentioned wanting to run before noon. I have routed details to the relevant agents.',
+    time: '8:12 AM',
+    agent: null,
+  },
+  {
+    question: null,
+    answer: 'Trial conversion is the critical number right now. Zero out of eleven is a signal, not a fluke. Your v4.1 "pure appreciation" curriculum optimized for completion but may have destroyed perceived value — therapists called it "emotional cotton candy." The one user who converted was on the harder v4 curriculum. I recommend: block 90 minutes this morning for the two user interviews you have scheduled, then draft a v4.2 spec with action prompts and stretch questions. The data is clear enough to act on.',
+    time: '8:12 AM',
+    agent: 'lovenotes',
+  },
+  {
+    question: 'What is the status of my job search? Any updates I missed?',
+    answer: 'Routing to your job search agent for the latest state.',
+    time: '8:15 AM',
+    agent: null,
+  },
+  {
+    question: null,
+    answer: 'You are in final-stage interviews with two companies. Emmanuel sent a follow-up email yesterday at 4:47 PM — he wants to schedule your panel for Thursday or Friday this week. You have not replied yet. Your portfolio site has three broken links on the project cards — I flagged these last session but they remain unfixed. Recommended next action: reply to Emmanuel within the hour, then fix the portfolio links. The panel prep can be a 30-minute block tomorrow evening.',
+    time: '8:15 AM',
+    agent: 'jobsearch',
+  },
+  {
+    question: 'How are my Remington students doing? Anything urgent?',
+    answer: 'Let me check with teaching.',
+    time: '8:24 AM',
+    agent: null,
+  },
+  {
+    question: null,
+    answer: '315 students across 6 sections. Grade submissions close Friday at 5 PM. You have 23 students flagged for missing assignments — 8 of those are in your Tuesday/Thursday section and have a pattern of late submissions. No new escalations from the department. One student (M. Torres) emailed asking about extra credit — this is the third time. The maintenance approach is working: everything is running, nothing needs heroics. Spend 20 minutes reviewing the flagged list and send one batch reminder email. That is sufficient.',
+    time: '8:24 AM',
+    agent: 'teaching',
+  },
+  {
+    question: 'I feel scattered. Too many things pulling at me. Help me get clarity.',
+    answer: 'Pausing. Let me look at what is actually competing for your attention right now.',
+    time: '9:01 AM',
+    agent: null,
+  },
+  {
+    question: null,
+    answer: '<p>You have four streams pulling at you today. Here is the honest ranking:</p><p><strong>1. LoveNotes user interviews</strong> — time-sensitive, scheduled, high-leverage. This is the one thing that moves the needle most. If you skip this, the product stalls another week.</p><p><strong>2. Reply to Emmanuel</strong> — two minutes, high stakes. Just do it before the interviews. Do not wordsmith it.</p><p><strong>3. Remington grade review</strong> — 20 minutes, has a hard deadline Friday. Schedule it for late afternoon.</p><p><strong>4. Run</strong> — your body is part of the system. Non-negotiable but flexible on timing. After the interviews.</p><p>Everything else is noise today. The portfolio links, the curriculum spec, the monthly review — those are tomorrow problems. Your only job right now is to reply to Emmanuel, then walk into those interviews prepared.</p>',
+    time: '9:01 AM',
+    agent: 'health',
+  },
+];
+
+// ── Render Agent Presence ──
+const presenceEl = document.getElementById('agentPresence');
+agents.forEach(a => {
+  const circle = document.createElement('div');
+  circle.className = `agent-circle c-${a.id} active`;
+  circle.dataset.agent = a.id;
+  circle.innerHTML = `${a.short}<span class="tooltip">${a.label}</span>`;
+  circle.addEventListener('mouseenter', () => highlightAgent(a.id));
+  circle.addEventListener('mouseleave', () => clearHighlight());
+  presenceEl.appendChild(circle);
+});
+
+// ── Render Cards ──
+const riverEl = document.getElementById('river');
+const COLLAPSE_DELAY = 30000;
+
+conversation.forEach((item, i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.animationDelay = `${i * 0.08}s`;
+
+  if (item.agent) {
+    card.classList.add('agent-routed', `agent-${item.agent}`);
+    card.dataset.agent = item.agent;
+    const threadLine = document.createElement('div');
+    threadLine.className = 'thread-line';
+    card.appendChild(threadLine);
+
+    const agentInfo = agents.find(a => a.id === item.agent);
+    const label = document.createElement('div');
+    label.className = 'agent-label';
+    label.innerHTML = `<span class="dot"></span>${agentInfo.label}`;
+    card.appendChild(label);
+  }
+
+  if (item.question) {
+    const q = document.createElement('div');
+    q.className = 'card-question';
+    q.textContent = item.question;
+    card.appendChild(q);
+  }
+
+  const ans = document.createElement('div');
+  ans.className = 'card-answer';
+  // If HTML content, use innerHTML; otherwise textContent wrapped in <p>
+  if (item.answer.startsWith('<')) {
+    ans.innerHTML = item.answer;
+  } else {
+    const p = document.createElement('p');
+    p.textContent = item.answer;
+    ans.appendChild(p);
+  }
+  card.appendChild(ans);
+
+  const time = document.createElement('div');
+  time.className = 'card-time';
+  time.textContent = item.time;
+  card.appendChild(time);
+
+  // Click to toggle collapse
+  card.addEventListener('click', () => {
+    card.classList.toggle('collapsed');
+    // Reset auto-collapse timer
+    clearTimeout(card._collapseTimer);
+    if (!card.classList.contains('collapsed')) {
+      card._collapseTimer = setTimeout(() => {
+        card.classList.add('collapsed');
+      }, COLLAPSE_DELAY);
+    }
+  });
+
+  // Auto-collapse after delay (stagger by index)
+  card._collapseTimer = setTimeout(() => {
+    card.classList.add('collapsed');
+  }, COLLAPSE_DELAY + i * 200);
+
+  riverEl.appendChild(card);
+});
+
+// ── Agent Highlighting ──
+function highlightAgent(agentId) {
+  document.querySelectorAll('.card').forEach(card => {
+    if (card.dataset.agent === agentId) {
+      card.classList.add('agent-highlight');
+      card.classList.remove('agent-dimmed');
+    } else {
+      card.classList.add('agent-dimmed');
+      card.classList.remove('agent-highlight');
+    }
+  });
+}
+function clearHighlight() {
+  document.querySelectorAll('.card').forEach(card => {
+    card.classList.remove('agent-highlight', 'agent-dimmed');
+  });
+}
+
+// ── River Depth Indicator ──
+function updateRiverDepth() {
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docHeight > 0 ? Math.min(scrollTop / docHeight, 1) : 0;
+  const depthEl = document.getElementById('riverDepth');
+  const trackH = depthEl.offsetHeight;
+
+  document.getElementById('riverDepthFill').style.height = `${pct * 100}%`;
+  document.getElementById('riverDepthThumb').style.top = `${pct * (trackH - 6)}px`;
+}
+window.addEventListener('scroll', updateRiverDepth, { passive: true });
+updateRiverDepth();
+
+// ── Input Hints ──
+const inputField = document.getElementById('inputField');
+const inputHints = document.getElementById('inputHints');
+let hintsTimer;
+
+function showHints() {
+  if (inputField.value === '') {
+    inputHints.classList.add('visible');
+  }
+}
+function hideHints() {
+  inputHints.classList.remove('visible');
+}
+
+inputField.addEventListener('focus', () => {
+  hintsTimer = setTimeout(showHints, 1200);
+});
+inputField.addEventListener('blur', () => {
+  clearTimeout(hintsTimer);
+  hideHints();
+});
+inputField.addEventListener('input', () => {
+  if (inputField.value !== '') {
+    hideHints();
+  } else {
+    showHints();
+  }
+});
+
+// ── Mock Send ──
+inputField.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && inputField.value.trim()) {
+    const text = inputField.value.trim();
+    inputField.value = '';
+    hideHints();
+
+    // Add user card
+    const card = document.createElement('div');
+    card.className = 'card';
+    const q = document.createElement('div');
+    q.className = 'card-question';
+    q.textContent = text;
+    card.appendChild(q);
+
+    const ans = document.createElement('div');
+    ans.className = 'card-answer';
+    const p = document.createElement('p');
+    p.textContent = 'Thinking...';
+    p.style.color = 'var(--text-faint)';
+    p.style.fontStyle = 'italic';
+    ans.appendChild(p);
+    card.appendChild(ans);
+
+    card.addEventListener('click', () => card.classList.toggle('collapsed'));
+
+    riverEl.appendChild(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    // Simulate response after delay
+    setTimeout(() => {
+      p.textContent = 'I have noted your request. In a live session, I would route this to the appropriate agent and stream a response here.';
+      p.style.color = '';
+      p.style.fontStyle = '';
+    }, 1500);
+  }
+});
+
+// ── Deactivate agent pulses after a delay (simulate settling) ──
+setTimeout(() => {
+  document.querySelectorAll('.agent-circle').forEach((c, i) => {
+    setTimeout(() => c.classList.remove('active'), i * 2000 + 3000);
+  });
+}, 5000);
+</script>
+
+</body>
+</html>

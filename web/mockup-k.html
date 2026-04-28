@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — River + Orbital + Attention Queue</title>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0c;
+  --bg-raised: #111114;
+  --bg-card: #151518;
+  --bg-card-hover: #1a1a1e;
+  --border: rgba(255,255,255,0.06);
+  --border-active: rgba(255,255,255,0.12);
+  --text: rgba(255,255,255,0.87);
+  --text-muted: rgba(255,255,255,0.45);
+  --text-dim: rgba(255,255,255,0.25);
+  --accent: #6e8cbe;
+  --green: #4a9;
+  --amber: #c90;
+  --red: #c55;
+  --blue-pulse: #5599cc;
+  --river-width: 680px;
+  --queue-width: 260px;
+  --orbital-height: 140px;
+  --input-height: 64px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Layout ── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#orbital-zone {
+  flex-shrink: 0;
+  height: var(--orbital-height);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  background: linear-gradient(180deg, #0c0c10 0%, var(--bg) 100%);
+}
+#orbital-zone.collapsed {
+  height: 32px;
+}
+
+#orbital-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+#orbital-collapse-btn {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 1px 10px;
+  cursor: pointer;
+  z-index: 5;
+  transition: color 0.2s, background 0.2s;
+  letter-spacing: 0.05em;
+}
+#orbital-collapse-btn:hover { color: var(--text-muted); background: rgba(255,255,255,0.06); }
+
+#orbital-zone.collapsed #orbital-canvas { display: none; }
+#orbital-zone.collapsed #orbital-collapse-btn { bottom: 4px; }
+
+/* Collapsed dot strip */
+#orbital-dots {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 16px;
+}
+#orbital-zone.collapsed #orbital-dots { display: flex; }
+.orbital-dot-mini {
+  width: 8px; height: 8px; border-radius: 50%;
+  opacity: 0.6;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.orbital-dot-mini.active { opacity: 1; transform: scale(1.3); }
+
+#main-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── River ── */
+#river-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+
+#river {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scroll-behavior: smooth;
+}
+#river::-webkit-scrollbar { width: 4px; }
+#river::-webkit-scrollbar-track { background: transparent; }
+#river::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+.river-inner {
+  max-width: var(--river-width);
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Message Bubbles ── */
+.msg {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  animation: msgIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Outbound (Christopher) */
+.msg.outbound {
+  align-self: flex-end;
+  background: #1c2a3a;
+  border: 1px solid rgba(100,160,220,0.15);
+  color: rgba(200,230,255,0.9);
+  border-bottom-right-radius: 4px;
+}
+.msg.outbound .msg-label {
+  font-size: 10px;
+  color: rgba(140,180,220,0.5);
+  margin-bottom: 3px;
+  text-align: right;
+}
+
+/* Inbound (Sutra / Agent) */
+.msg.inbound {
+  align-self: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.msg.inbound .msg-label {
+  font-size: 10px;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.msg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.msg-badge .badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.msg-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+/* ── Completion Cards ── */
+.completion-card {
+  align-self: flex-start;
+  max-width: 92%;
+  background: var(--bg-card);
+  border: 1px solid rgba(74, 153, 136, 0.25);
+  border-left: 3px solid rgba(74, 153, 136, 0.5);
+  border-radius: 12px;
+  padding: 12px 16px;
+  animation: slideInLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  box-shadow: -4px 0 20px rgba(74, 153, 136, 0.05);
+  transition: border-color 0.3s;
+}
+.completion-card:hover { border-color: rgba(74, 153, 136, 0.4); }
+.completion-card.acknowledged { opacity: 0.6; }
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.completion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.completion-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(74, 153, 136, 0.15);
+  color: #6bc4a8;
+}
+.completion-body { color: var(--text); font-size: 13px; }
+
+/* Action buttons row */
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.card-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-active);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); border-color: rgba(255,255,255,0.2); }
+.card-btn.primary { background: rgba(74,153,136,0.15); border-color: rgba(74,153,136,0.3); color: #6bc4a8; }
+.card-btn.primary:hover { background: rgba(74,153,136,0.25); }
+
+/* File chips */
+.file-chips {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(110,140,190,0.1);
+  border: 1px solid rgba(110,140,190,0.15);
+  color: rgba(140,180,220,0.8);
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.file-chip:hover { background: rgba(110,140,190,0.18); border-color: rgba(110,140,190,0.3); }
+.file-chip svg { width: 12px; height: 12px; opacity: 0.6; }
+
+/* Needs-input card */
+.input-card {
+  align-self: flex-start;
+  max-width: 92%;
+  background: var(--bg-card);
+  border: 1px solid rgba(200, 85, 85, 0.25);
+  border-left: 3px solid rgba(200, 85, 85, 0.5);
+  border-radius: 12px;
+  padding: 12px 16px;
+  animation: slideInLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: -4px 0 20px rgba(200, 85, 85, 0.05);
+}
+.input-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(200, 85, 85, 0.15);
+  color: #e07070;
+}
+
+/* Permission card */
+.permission-card {
+  align-self: flex-start;
+  max-width: 92%;
+  background: var(--bg-card);
+  border: 1px solid rgba(204, 153, 0, 0.25);
+  border-left: 3px solid rgba(204, 153, 0, 0.5);
+  border-radius: 12px;
+  padding: 12px 16px;
+  animation: slideInLeft 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: -4px 0 20px rgba(204, 153, 0, 0.05);
+}
+.permission-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(204, 153, 0, 0.15);
+  color: #dda520;
+}
+
+/* Summary card (while you were away) */
+.summary-card {
+  align-self: flex-start;
+  max-width: 94%;
+  width: 100%;
+  background: linear-gradient(135deg, #12141a 0%, #151518 100%);
+  border: 1px solid rgba(110,140,190,0.2);
+  border-radius: 14px;
+  padding: 16px 18px;
+  animation: msgIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.summary-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.summary-items { list-style: none; }
+.summary-items li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.summary-items li:hover { color: var(--text); }
+.summary-items li:last-child { border-bottom: none; }
+
+/* Thread (indented reply) */
+.thread-reply {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(255,255,255,0.06);
+}
+
+/* Reply affordance */
+.msg-reply-btn, .card-reply-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+}
+.msg:hover .msg-reply-btn,
+.completion-card:hover .card-reply-btn,
+.input-card:hover .card-reply-btn {
+  opacity: 1;
+}
+.msg-reply-btn:hover, .card-reply-btn:hover {
+  border-color: var(--border-active);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+}
+
+/* Multi-computer indicator */
+.remote-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: var(--text-dim);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  margin-left: 4px;
+}
+.remote-indicator svg { width: 10px; height: 10px; }
+
+/* ── Attention Queue ── */
+#queue {
+  width: var(--queue-width);
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+#queue.empty {
+  width: 36px;
+}
+
+#queue-header {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+#queue.empty #queue-header { display: none; }
+
+#queue-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+#queue-items::-webkit-scrollbar { width: 3px; }
+#queue-items::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+#queue.empty #queue-items { display: none; }
+
+#queue-empty-state {
+  display: none;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 16px 10px;
+  text-align: center;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+}
+#queue.empty #queue-empty-state { display: flex; }
+
+.q-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 2px;
+  position: relative;
+}
+.q-item:hover { background: rgba(255,255,255,0.03); }
+
+.q-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.q-dot.red { background: var(--red); box-shadow: 0 0 6px rgba(200,85,85,0.4); }
+.q-dot.amber { background: var(--amber); box-shadow: 0 0 6px rgba(204,153,0,0.4); }
+.q-dot.green { background: var(--green); box-shadow: 0 0 6px rgba(74,153,136,0.3); }
+.q-dot.blue {
+  background: var(--blue-pulse);
+  animation: bluePulse 2s ease-in-out infinite;
+}
+@keyframes bluePulse {
+  0%, 100% { opacity: 0.6; box-shadow: 0 0 4px rgba(85,153,204,0.2); }
+  50% { opacity: 1; box-shadow: 0 0 8px rgba(85,153,204,0.5); }
+}
+
+.q-content {
+  flex: 1;
+  min-width: 0;
+}
+.q-agent {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.q-preview {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.q-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.q-action-btn {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-active);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.q-action-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.q-action-btn.approve { border-color: rgba(74,153,136,0.3); color: #6bc4a8; }
+.q-action-btn.approve:hover { background: rgba(74,153,136,0.15); }
+.q-action-btn.reject { border-color: rgba(200,85,85,0.2); color: #c55; }
+.q-action-btn.reject:hover { background: rgba(200,85,85,0.1); }
+
+/* ── Input Bar ── */
+#input-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+  background: var(--bg);
+}
+#input-bar {
+  width: 100%;
+  max-width: var(--river-width);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-active);
+  border-radius: 24px;
+  padding: 6px 6px 6px 16px;
+  transition: border-color 0.3s;
+}
+#input-bar:focus-within { border-color: rgba(110,140,190,0.3); }
+
+#input-prefix {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
+  margin-right: 6px;
+  display: none;
+}
+#input-prefix.visible { display: block; }
+
+#input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  caret-color: var(--accent);
+  min-width: 0;
+}
+#input-field::placeholder { color: var(--text-dim); }
+
+#send-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(110,140,190,0.2);
+  background: rgba(110,140,190,0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+#send-btn:hover { background: rgba(110,140,190,0.2); color: var(--text); border-color: rgba(110,140,190,0.35); }
+
+/* ── Scenario indicator ── */
+#scenario-bar {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17,17,20,0.9);
+  border: 1px solid var(--border-active);
+  border-radius: 10px;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  z-index: 100;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  text-align: center;
+  max-width: 400px;
+}
+#scenario-bar.visible { opacity: 1; }
+
+/* ── Typing indicator ── */
+.typing-indicator {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  animation: msgIn 0.3s ease;
+}
+.typing-dots { display: flex; gap: 3px; }
+.typing-dots span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: dotBounce 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+  40% { transform: translateY(-4px); opacity: 0.8; }
+}
+.typing-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── Agent status text in orbital ── */
+#orbital-status {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ── Expand/collapse detail ── */
+.detail-expand {
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+.detail-expand:hover { color: var(--text-muted); }
+.detail-body {
+  display: none;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.detail-body.open { display: block; }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  #orbital-zone { display: none; }
+  #queue { display: none; }
+  #input-bar { max-width: 100%; }
+  .msg, .completion-card, .input-card, .permission-card, .summary-card { max-width: 96%; }
+  :root { --river-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Orbital Header -->
+  <div id="orbital-zone">
+    <canvas id="orbital-canvas"></canvas>
+    <div id="orbital-dots"></div>
+    <div id="orbital-status">8 agents online</div>
+    <button id="orbital-collapse-btn">collapse</button>
+  </div>
+
+  <div id="main-area">
+    <!-- River -->
+    <div id="river-container">
+      <div id="river">
+        <div class="river-inner" id="river-inner"></div>
+      </div>
+      <div id="input-area">
+        <div id="input-bar">
+          <span id="input-prefix">@ContentWriter &gt;</span>
+          <input type="text" id="input-field" placeholder="Talk to Sutra..." autocomplete="off" />
+          <button id="send-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attention Queue -->
+    <div id="queue">
+      <div id="queue-header">Attention Queue</div>
+      <div id="queue-items"></div>
+      <div id="queue-empty-state">All clear</div>
+    </div>
+  </div>
+</div>
+
+<div id="scenario-bar"></div>
+
+<script>
+// ── SVG Icons (inline, Lucide-style) ──
+const ICONS = {
+  file: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  reply: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
+  check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  alert: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  clock: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  expand: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`,
+  server: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`,
+  inbox: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
+  zap: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+};
+
+// ── Agent Definitions ──
+const AGENTS = [
+  { id: 'lovenotes', name: 'LoveNotes', color: '#c76b8a', active: false, remote: false },
+  { id: 'geoint', name: 'GEOINT', color: '#7a9ec7', active: false, remote: true },
+  { id: 'content', name: 'ContentWriter', color: '#b8a06a', active: false, remote: false },
+  { id: 'appfactory', name: 'App Factory', color: '#8a6ec7', active: false, remote: true },
+  { id: 'jobsearch', name: 'Job Search', color: '#6ab89e', active: false, remote: false },
+  { id: 'teaching', name: 'Remington', color: '#c7976a', active: false, remote: false },
+  { id: 'research', name: 'Research', color: '#6a8ac7', active: false, remote: false },
+  { id: 'sutra', name: 'Sutra', color: '#8899bb', active: true, remote: false },
+  { id: 'health', name: 'Health', color: '#6ab87a', active: false, remote: false },
+  { id: 'creative', name: 'Creative', color: '#c76ac7', active: false, remote: false },
+];
+
+// ── Orbital Canvas ──
+const orbitalCanvas = document.getElementById('orbital-canvas');
+const orbCtx = orbitalCanvas.getContext('2d');
+let orbitalAnimFrame;
+let agentOrbitalState = AGENTS.map((a, i) => ({
+  angle: (Math.PI * 2 * i) / AGENTS.length,
+  radius: a.id === 'sutra' ? 0 : 0.6 + Math.random() * 0.2,
+  targetRadius: a.id === 'sutra' ? 0 : 0.6,
+  speed: 0.001 + Math.random() * 0.002,
+  pulsePhase: Math.random() * Math.PI * 2,
+  dispatching: false,
+  dispatchProgress: 0,
+}));
+
+function resizeOrbital() {
+  const rect = orbitalCanvas.parentElement.getBoundingClientRect();
+  orbitalCanvas.width = rect.width * devicePixelRatio;
+  orbitalCanvas.height = rect.height * devicePixelRatio;
+  orbCtx.scale(devicePixelRatio, devicePixelRatio);
+}
+window.addEventListener('resize', resizeOrbital);
+
+function drawOrbital() {
+  const w = orbitalCanvas.width / devicePixelRatio;
+  const h = orbitalCanvas.height / devicePixelRatio;
+  orbCtx.clearRect(0, 0, w, h);
+
+  const cx = w / 2;
+  const cy = (h / 2) - 4;
+  const maxR = Math.min(w * 0.38, h * 0.38);
+  const now = Date.now() / 1000;
+
+  // Orbit rings (subtle)
+  for (let r = 0.4; r <= 0.9; r += 0.25) {
+    orbCtx.beginPath();
+    orbCtx.arc(cx, cy, maxR * r, 0, Math.PI * 2);
+    orbCtx.strokeStyle = `rgba(255,255,255,${0.02})`;
+    orbCtx.lineWidth = 1;
+    orbCtx.stroke();
+  }
+
+  // Agents
+  AGENTS.forEach((agent, i) => {
+    const state = agentOrbitalState[i];
+    state.angle += state.speed;
+    state.radius += (state.targetRadius - state.radius) * 0.03;
+
+    const x = agent.id === 'sutra' ? cx : cx + Math.cos(state.angle) * maxR * state.radius;
+    const y = agent.id === 'sutra' ? cy : cy + Math.sin(state.angle) * maxR * state.radius;
+    const pulse = Math.sin(now * 2 + state.pulsePhase) * 0.3 + 0.7;
+    const baseSize = agent.id === 'sutra' ? 8 : (agent.active ? 5 : 3.5);
+    const size = agent.active ? baseSize * (0.9 + pulse * 0.2) : baseSize;
+
+    // Dispatch line
+    if (state.dispatching) {
+      state.dispatchProgress = Math.min(1, state.dispatchProgress + 0.02);
+      const lx = cx + (x - cx) * state.dispatchProgress;
+      const ly = cy + (y - cy) * state.dispatchProgress;
+      orbCtx.beginPath();
+      orbCtx.moveTo(cx, cy);
+      orbCtx.lineTo(lx, ly);
+      orbCtx.strokeStyle = agent.color + '60';
+      orbCtx.lineWidth = 1.5;
+      orbCtx.stroke();
+      if (state.dispatchProgress >= 1) {
+        setTimeout(() => { state.dispatching = false; state.dispatchProgress = 0; }, 2000);
+      }
+    }
+
+    // Glow for active
+    if (agent.active) {
+      const grad = orbCtx.createRadialGradient(x, y, 0, x, y, size * 4);
+      grad.addColorStop(0, agent.color + '25');
+      grad.addColorStop(1, agent.color + '00');
+      orbCtx.beginPath();
+      orbCtx.arc(x, y, size * 4, 0, Math.PI * 2);
+      orbCtx.fillStyle = grad;
+      orbCtx.fill();
+    }
+
+    // Dot
+    orbCtx.beginPath();
+    orbCtx.arc(x, y, size, 0, Math.PI * 2);
+    orbCtx.fillStyle = agent.color + (agent.active ? 'dd' : '66');
+    orbCtx.fill();
+
+    // Label for sutra
+    if (agent.id === 'sutra') {
+      orbCtx.font = '9px -apple-system, sans-serif';
+      orbCtx.fillStyle = 'rgba(255,255,255,0.3)';
+      orbCtx.textAlign = 'center';
+      orbCtx.fillText('SUTRA', cx, cy + 18);
+    }
+
+    // Label for active agents
+    if (agent.active && agent.id !== 'sutra') {
+      orbCtx.font = '9px -apple-system, sans-serif';
+      orbCtx.fillStyle = agent.color + '99';
+      orbCtx.textAlign = 'center';
+      orbCtx.fillText(agent.name, x, y - size - 5);
+    }
+  });
+
+  orbitalAnimFrame = requestAnimationFrame(drawOrbital);
+}
+
+function initOrbital() {
+  resizeOrbital();
+  drawOrbital();
+
+  // Build collapsed dot strip
+  const dotsEl = document.getElementById('orbital-dots');
+  AGENTS.forEach(a => {
+    const d = document.createElement('div');
+    d.className = 'orbital-dot-mini' + (a.active ? ' active' : '');
+    d.style.background = a.color;
+    d.title = a.name;
+    d.dataset.agentId = a.id;
+    dotsEl.appendChild(d);
+  });
+}
+
+function setAgentActive(agentId, active) {
+  const idx = AGENTS.findIndex(a => a.id === agentId);
+  if (idx === -1) return;
+  AGENTS[idx].active = active;
+  agentOrbitalState[idx].targetRadius = active ? 0.38 : 0.6 + Math.random() * 0.15;
+
+  // Update collapsed dots
+  const dots = document.querySelectorAll('.orbital-dot-mini');
+  dots.forEach(d => {
+    if (d.dataset.agentId === agentId) {
+      d.classList.toggle('active', active);
+    }
+  });
+}
+
+function dispatchToAgent(agentId) {
+  const idx = AGENTS.findIndex(a => a.id === agentId);
+  if (idx === -1) return;
+  agentOrbitalState[idx].dispatching = true;
+  agentOrbitalState[idx].dispatchProgress = 0;
+}
+
+// Collapse toggle
+document.getElementById('orbital-collapse-btn').addEventListener('click', () => {
+  const zone = document.getElementById('orbital-zone');
+  const btn = document.getElementById('orbital-collapse-btn');
+  zone.classList.toggle('collapsed');
+  btn.textContent = zone.classList.contains('collapsed') ? 'expand' : 'collapse';
+});
+
+// ── River Rendering ──
+const riverInner = document.getElementById('river-inner');
+const river = document.getElementById('river');
+
+function scrollToBottom(smooth) {
+  setTimeout(() => {
+    river.scrollTo({ top: river.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, 50);
+}
+
+function addOutbound(text) {
+  const el = document.createElement('div');
+  el.className = 'msg outbound';
+  el.innerHTML = `<div class="msg-label">Christopher</div><div>${text}</div>`;
+  riverInner.appendChild(el);
+  scrollToBottom(true);
+}
+
+function addInbound(agentId, html, { time, detail, files, isThread } = {}) {
+  const agent = AGENTS.find(a => a.id === agentId) || AGENTS.find(a => a.id === 'sutra');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg inbound' + (isThread ? ' thread-reply' : '');
+
+  const remoteTag = agent.remote ? `<span class="remote-indicator">${ICONS.server} remote</span>` : '';
+  const timeTag = time ? `<span class="msg-time">${time}</span>` : '';
+
+  let detailHtml = '';
+  if (detail) {
+    detailHtml = `<div class="detail-expand" onclick="this.nextElementSibling.classList.toggle('open')">${ICONS.expand} more detail</div><div class="detail-body">${detail}</div>`;
+  }
+
+  let filesHtml = '';
+  if (files && files.length) {
+    filesHtml = '<div class="file-chips">' + files.map(f => `<div class="file-chip">${ICONS.file} ${f}</div>`).join('') + '</div>';
+  }
+
+  wrapper.innerHTML = `
+    <div class="msg-label">
+      <span class="msg-badge"><span class="badge-dot" style="background:${agent.color}"></span>${agent.name}</span>
+      ${remoteTag}
+      ${timeTag}
+    </div>
+    <div>${html}</div>
+    ${detailHtml}
+    ${filesHtml}
+    <button class="msg-reply-btn" title="Reply" onclick="startReply('${agent.id}', '${agent.name}')">${ICONS.reply}</button>
+  `;
+  riverInner.appendChild(wrapper);
+  scrollToBottom(true);
+}
+
+function addCompletion(agentId, title, body, { files, actions, detail } = {}) {
+  const agent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
+  const card = document.createElement('div');
+  card.className = 'completion-card';
+
+  const remoteTag = agent.remote ? `<span class="remote-indicator">${ICONS.server} remote</span>` : '';
+
+  let filesHtml = '';
+  if (files && files.length) {
+    filesHtml = '<div class="file-chips">' + files.map(f => `<div class="file-chip">${ICONS.file} ${f}</div>`).join('') + '</div>';
+  }
+
+  let actionsHtml = '';
+  if (actions && actions.length) {
+    actionsHtml = '<div class="card-actions">' + actions.map(a =>
+      `<button class="card-btn ${a.primary ? 'primary' : ''}" onclick="${a.onclick || ''}">${a.label}</button>`
+    ).join('') + '</div>';
+  }
+
+  let detailHtml = '';
+  if (detail) {
+    detailHtml = `<div class="detail-expand" onclick="this.nextElementSibling.classList.toggle('open')">${ICONS.expand} more detail</div><div class="detail-body">${detail}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="completion-header">
+      <span class="msg-badge"><span class="badge-dot" style="background:${agent.color}"></span>${agent.name}</span>
+      <span class="completion-tag">${ICONS.check} completed</span>
+      ${remoteTag}
+      <span class="msg-time">just now</span>
+    </div>
+    <div class="completion-body">${body}</div>
+    ${detailHtml}
+    ${filesHtml}
+    ${actionsHtml}
+    <button class="card-reply-btn" title="Reply" onclick="startReply('${agent.id}', '${agent.name}')">${ICONS.reply}</button>
+  `;
+  riverInner.appendChild(card);
+  scrollToBottom(true);
+}
+
+function addInputCard(agentId, question, options) {
+  const agent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
+  const card = document.createElement('div');
+  card.className = 'input-card';
+
+  const remoteTag = agent.remote ? `<span class="remote-indicator">${ICONS.server} remote</span>` : '';
+  const actionsHtml = '<div class="card-actions">' + options.map(o =>
+    `<button class="card-btn" onclick="this.parentElement.parentElement.style.opacity='0.5'">${o}</button>`
+  ).join('') + '</div>';
+
+  card.innerHTML = `
+    <div class="completion-header">
+      <span class="msg-badge"><span class="badge-dot" style="background:${agent.color}"></span>${agent.name}</span>
+      <span class="input-tag">${ICONS.alert} needs input</span>
+      ${remoteTag}
+    </div>
+    <div class="completion-body">${question}</div>
+    ${actionsHtml}
+    <button class="card-reply-btn" title="Reply" onclick="startReply('${agent.id}', '${agent.name}')">${ICONS.reply}</button>
+  `;
+  riverInner.appendChild(card);
+  scrollToBottom(true);
+}
+
+function addPermissionCard(agentId, request, detail) {
+  const agent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
+  const card = document.createElement('div');
+  card.className = 'permission-card';
+
+  const remoteTag = agent.remote ? `<span class="remote-indicator">${ICONS.server} remote</span>` : '';
+
+  card.innerHTML = `
+    <div class="completion-header">
+      <span class="msg-badge"><span class="badge-dot" style="background:${agent.color}"></span>${agent.name}</span>
+      <span class="permission-tag">${ICONS.clock} needs permission</span>
+      ${remoteTag}
+    </div>
+    <div class="completion-body">${request}</div>
+    <div class="card-actions">
+      <button class="card-btn primary" onclick="this.closest('.permission-card').style.opacity='0.4'">${ICONS.check} Approve</button>
+      <button class="card-btn" onclick="this.closest('.permission-card').style.opacity='0.4'">Reject</button>
+    </div>
+  `;
+  riverInner.appendChild(card);
+  scrollToBottom(true);
+}
+
+function addSummaryCard(title, items) {
+  const card = document.createElement('div');
+  card.className = 'summary-card';
+  const itemsHtml = items.map(it => {
+    const dotColor = it.type === 'completed' ? 'var(--green)' : it.type === 'input' ? 'var(--red)' : it.type === 'working' ? 'var(--blue-pulse)' : 'var(--amber)';
+    return `<li><span class="q-dot" style="background:${dotColor};width:6px;height:6px;border-radius:50%;flex-shrink:0"></span>${it.text}</li>`;
+  }).join('');
+  card.innerHTML = `
+    <div class="summary-title">${ICONS.inbox} ${title}</div>
+    <ul class="summary-items">${itemsHtml}</ul>
+  `;
+  riverInner.appendChild(card);
+  scrollToBottom(true);
+}
+
+function addTyping(agentId) {
+  const agent = AGENTS.find(a => a.id === agentId) || AGENTS.find(a => a.id === 'sutra');
+  const el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.id = 'typing-' + agentId;
+  el.innerHTML = `
+    <span class="msg-badge"><span class="badge-dot" style="background:${agent.color}"></span>${agent.name}</span>
+    <div class="typing-dots"><span></span><span></span><span></span></div>
+  `;
+  riverInner.appendChild(el);
+  scrollToBottom(true);
+  return el;
+}
+
+function removeTyping(agentId) {
+  const el = document.getElementById('typing-' + agentId);
+  if (el) el.remove();
+}
+
+// ── Queue ──
+const queueItems = document.getElementById('queue-items');
+const queueEl = document.getElementById('queue');
+let queueData = [];
+
+function renderQueue() {
+  queueItems.innerHTML = '';
+  if (queueData.length === 0) {
+    queueEl.classList.add('empty');
+    return;
+  }
+  queueEl.classList.remove('empty');
+
+  // Sort: red first, amber, green, blue last
+  const order = { input: 0, permission: 1, completed: 2, working: 3 };
+  const sorted = [...queueData].sort((a, b) => (order[a.type] || 9) - (order[b.type] || 9));
+
+  sorted.forEach(item => {
+    const dotClass = item.type === 'input' ? 'red' : item.type === 'permission' ? 'amber' : item.type === 'completed' ? 'green' : 'blue';
+    const agent = AGENTS.find(a => a.id === item.agentId);
+    const remoteTag = (agent && agent.remote) ? `<span class="remote-indicator">${ICONS.server}</span>` : '';
+
+    const el = document.createElement('div');
+    el.className = 'q-item';
+
+    let actionsHtml = '';
+    if (item.type === 'permission') {
+      actionsHtml = `<div class="q-actions">
+        <button class="q-action-btn approve" onclick="removeQueueItem('${item.id}')">Approve</button>
+        <button class="q-action-btn reject" onclick="removeQueueItem('${item.id}')">Reject</button>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <span class="q-dot ${dotClass}"></span>
+      <div class="q-content">
+        <div class="q-agent">${item.agent} ${remoteTag}</div>
+        <div class="q-preview">${item.preview}</div>
+        ${actionsHtml}
+      </div>
+    `;
+    el.onclick = (e) => {
+      if (e.target.closest('.q-action-btn')) return;
+      // Could scroll river to relevant card here
+    };
+    queueItems.appendChild(el);
+  });
+}
+
+function addQueueItem(item) {
+  queueData.push(item);
+  renderQueue();
+}
+
+function removeQueueItem(id) {
+  queueData = queueData.filter(q => q.id !== id);
+  renderQueue();
+}
+
+function clearQueue() {
+  queueData = [];
+  renderQueue();
+}
+
+// ── Reply ──
+let replyTarget = null;
+
+function startReply(agentId, agentName) {
+  replyTarget = agentId;
+  const prefix = document.getElementById('input-prefix');
+  prefix.textContent = `@${agentName} >`;
+  prefix.classList.add('visible');
+  document.getElementById('input-field').focus();
+  document.getElementById('input-field').placeholder = `Reply to ${agentName}...`;
+}
+
+function clearReply() {
+  replyTarget = null;
+  document.getElementById('input-prefix').classList.remove('visible');
+  document.getElementById('input-field').placeholder = 'Talk to Sutra...';
+}
+
+// ── Scenario Bar ──
+function showScenario(text) {
+  const bar = document.getElementById('scenario-bar');
+  bar.textContent = text;
+  bar.classList.add('visible');
+  setTimeout(() => bar.classList.remove('visible'), 3000);
+}
+
+// ── Scenario Engine ──
+let currentScenario = -1;
+const scenarios = [
+  // 0: Morning startup
+  async function() {
+    showScenario('Scenario 1/10: Morning startup');
+    clearReply();
+    riverInner.innerHTML = '';
+    clearQueue();
+    AGENTS.forEach(a => { if (a.id !== 'sutra') setAgentActive(a.id, false); });
+
+    await wait(400);
+    addOutbound('status');
+    setAgentActive('sutra', true);
+
+    await wait(800);
+    const t = addTyping('sutra');
+    await wait(1500);
+    removeTyping('sutra');
+
+    addInbound('sutra', `
+      <div style="margin-bottom:8px"><strong>Morning status — 8 agents reporting</strong></div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.7">
+        <span style="color:#c76b8a">LoveNotes</span> — 11 couples active, 2 stale response chains<br>
+        <span style="color:#7a9ec7">GEOINT</span> — overnight briefing ready, 1 conflict flagged<br>
+        <span style="color:#b8a06a">ContentWriter</span> — 20 Reddit posts drafted overnight<br>
+        <span style="color:#8a6ec7">App Factory</span> — calculator-app built, pending deploy<br>
+        <span style="color:#6ab89e">Job Search</span> — 3 new listings match your criteria<br>
+        <span style="color:#c7976a">Remington</span> — 315 students, no action needed<br>
+        <span style="color:#6a8ac7">Research</span> — idle, last task: agent-chat architecture<br>
+        <span style="color:#6ab87a">Health</span> — workout plan generated for this week
+      </div>
+    `, { time: '8:02 AM' });
+
+    await wait(600);
+    addQueueItem({ id: 'q1', type: 'input', agentId: 'geoint', agent: 'GEOINT', preview: 'Two sources conflict on Taiwan strait' });
+    addQueueItem({ id: 'q2', type: 'completed', agentId: 'content', agent: 'ContentWriter', preview: '20 Reddit posts drafted' });
+
+    document.getElementById('orbital-status').textContent = '8 agents online — 2 items need attention';
+  },
+
+  // 1: Dispatch to LoveNotes
+  async function() {
+    showScenario('Scenario 2/10: Dispatch to agent');
+    addOutbound('check lovenotes health');
+
+    await wait(300);
+    setAgentActive('lovenotes', true);
+    dispatchToAgent('lovenotes');
+
+    const t = addTyping('lovenotes');
+    await wait(2000);
+    removeTyping('lovenotes');
+
+    addInbound('lovenotes', `
+      <div style="margin-bottom:6px"><strong>LoveNotes Health Check</strong></div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.7">
+        <strong>Active couples:</strong> 11 (5 paid, 6 trial)<br>
+        <strong>Response rate:</strong> 72% (7-day avg)<br>
+        <strong>Stale chains:</strong> 2 couples haven't responded in 3+ days<br>
+        <strong>SMS delivery:</strong> 100% (Twilio healthy)<br>
+        <strong>Trial conversions:</strong> 0/6 — still concerning<br>
+        <strong>Curriculum:</strong> v4.1 active, v4.2 drafted but not deployed
+      </div>
+    `, {
+      time: '8:04 AM',
+      detail: 'Stale couples: Marcus & Keisha (last response Apr 5), David & Sarah (last response Apr 3). Both on free tier. Recommend sending re-engagement prompts. Paid couples all active within 24h.'
+    });
+
+    addQueueItem({ id: 'q3', type: 'working', agentId: 'lovenotes', agent: 'LoveNotes', preview: 'Generating stale-couple report...' });
+    document.getElementById('orbital-status').textContent = '8 agents online — LoveNotes active';
+  },
+
+  // 2: Inbound completion (ContentWriter)
+  async function() {
+    showScenario('Scenario 3/10: Inbound completion — async work finished');
+    setAgentActive('content', true);
+
+    await wait(600);
+    addCompletion('content', 'Content batch complete', '20 Reddit posts drafted across 4 subreddits. Topics: agent orchestration (8), personal OS (5), ADHD productivity (4), prototype culture (3). All formatted for Reddit conventions.', {
+      actions: [
+        { label: 'Review posts', primary: true },
+        { label: 'Approve all' },
+        { label: 'Dismiss' },
+      ],
+      detail: 'Subreddits targeted: r/ChatGPT, r/productivity, r/ADHD, r/SideProject. Each post includes title, body, and suggested posting time based on sub activity patterns. Estimated combined reach: 12-18k impressions based on historical performance.'
+    });
+
+    // Update queue
+    removeQueueItem('q2');
+    addQueueItem({ id: 'q2b', type: 'completed', agentId: 'content', agent: 'ContentWriter', preview: '20 Reddit posts ready for review' });
+  },
+
+  // 3: Needs input (GEOINT)
+  async function() {
+    showScenario('Scenario 4/10: Agent needs your input');
+    setAgentActive('geoint', true);
+    dispatchToAgent('geoint');
+
+    await wait(500);
+    addInputCard('geoint',
+      'Two sources conflict on the Taiwan Strait situation. Reuters reports increased naval activity, but OSINT satellite data shows normal patterns. The discrepancy affects today\'s briefing confidence level. Which source should I weight higher?',
+      ['Reuters (traditional media)', 'OSINT satellite data', 'Flag both, low confidence']
+    );
+
+    // Queue already has this item from scenario 0
+  },
+
+  // 4: Permission request (App Factory)
+  async function() {
+    showScenario('Scenario 5/10: Agent requests permission');
+    setAgentActive('appfactory', true);
+
+    await wait(400);
+    addPermissionCard('appfactory',
+      'Calculator app build complete. Ready to deploy to staging at <span style="color:var(--accent)">apps.sutra.cc/calculator</span>. This will be publicly accessible.',
+      'Build: 1.2MB, 0 errors, 0 warnings. Stack: vanilla HTML/JS. No external dependencies.'
+    );
+
+    addQueueItem({ id: 'q4', type: 'permission', agentId: 'appfactory', agent: 'App Factory', preview: 'Deploy calculator-app to staging?' });
+  },
+
+  // 5: File creation
+  async function() {
+    showScenario('Scenario 6/10: Agent creates files');
+
+    await wait(300);
+    addCompletion('geoint', 'Daily briefing generated', 'GEOINT daily briefing compiled. 4 hotspots tracked, 1 new development flagged. Overall threat assessment: moderate. Taiwan strait analysis marked low-confidence per your guidance.', {
+      files: ['geoint-briefing.md', 'hotspot-tracker.json', 'satellite-analysis.png'],
+      actions: [
+        { label: 'Open briefing', primary: true },
+        { label: 'Reveal in Finder' },
+      ],
+    });
+
+    removeQueueItem('q1');
+    setAgentActive('geoint', false);
+  },
+
+  // 6: While you were away
+  async function() {
+    showScenario('Scenario 7/10: While you were away');
+
+    await wait(300);
+    addSummaryCard('While you were away (45 min)', [
+      { type: 'completed', text: 'ContentWriter finished 20 Reddit posts' },
+      { type: 'completed', text: 'Health generated weekly workout plan' },
+      { type: 'completed', text: 'App Factory built unit-converter app' },
+      { type: 'input', text: 'GEOINT needs source preference for briefing' },
+    ]);
+
+    addQueueItem({ id: 'q5', type: 'completed', agentId: 'health', agent: 'Health', preview: 'Weekly workout plan ready' });
+    addQueueItem({ id: 'q6', type: 'completed', agentId: 'appfactory', agent: 'App Factory', preview: 'unit-converter built' });
+  },
+
+  // 7: Direct reply (threaded)
+  async function() {
+    showScenario('Scenario 8/10: Direct reply to agent');
+    startReply('content', 'ContentWriter');
+
+    await wait(600);
+    // Simulate user typing
+    addOutbound('@ContentWriter — The ADHD posts need a more personal angle. Reference my own system, not generic tips.');
+    clearReply();
+
+    setAgentActive('content', true);
+    const t = addTyping('content');
+    await wait(1800);
+    removeTyping('content');
+
+    addInbound('content', 'Got it. Rewriting 4 ADHD posts with personal-OS framing: constraint-based focus, agent delegation for executive function, and the "one thing at a time" principle. Will reference your actual daily workflow. Ready in ~10 minutes.', {
+      time: '8:12 AM',
+      isThread: false
+    });
+
+    addQueueItem({ id: 'q7', type: 'working', agentId: 'content', agent: 'ContentWriter', preview: 'Rewriting 4 ADHD posts...' });
+  },
+
+  // 8: Queue empty
+  async function() {
+    showScenario('Scenario 9/10: All clear — queue empty');
+    clearQueue();
+
+    await wait(300);
+    addInbound('sutra', 'All items handled. No agents need your attention. 3 agents working in background: ContentWriter (ADHD rewrites), Health (meal plan), Job Search (screening listings).', { time: '8:15 AM' });
+
+    setAgentActive('lovenotes', false);
+    setAgentActive('geoint', false);
+    setAgentActive('appfactory', false);
+    document.getElementById('orbital-status').textContent = '8 agents online — all clear';
+  },
+
+  // 9: Multi-computer
+  async function() {
+    showScenario('Scenario 10/10: Multi-computer agents');
+
+    await wait(400);
+    addCompletion('appfactory', 'Unit converter deployed', 'Built and deployed unit-converter to <span style="color:var(--accent)">apps.sutra.cc/units</span>. Running on Mac Mini (studio). 847 bytes, instant load.', {
+      files: ['unit-converter/index.html'],
+      actions: [
+        { label: 'Open app', primary: true },
+        { label: 'View source' },
+      ]
+    });
+
+    await wait(800);
+    addCompletion('geoint', 'Satellite pass analyzed', 'New imagery from Sentinel-2 processed on Mac Mini (studio). Taiwan Strait shows 3 additional vessels vs. yesterday. Updated hotspot tracker.', {
+      files: ['satellite-analysis-0408.png', 'hotspot-tracker.json'],
+      actions: [
+        { label: 'View imagery', primary: true },
+      ]
+    });
+
+    setAgentActive('appfactory', true);
+    setAgentActive('geoint', true);
+    addQueueItem({ id: 'q8', type: 'completed', agentId: 'appfactory', agent: 'App Factory', preview: 'unit-converter deployed (remote)' });
+    addQueueItem({ id: 'q9', type: 'completed', agentId: 'geoint', agent: 'GEOINT', preview: 'Satellite analysis complete (remote)' });
+    document.getElementById('orbital-status').textContent = '8 agents online — 2 remote completions';
+  },
+];
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runNextScenario() {
+  currentScenario = (currentScenario + 1) % scenarios.length;
+  if (currentScenario === 0) {
+    // Reset everything for loop
+    riverInner.innerHTML = '';
+    clearQueue();
+    AGENTS.forEach(a => { if (a.id !== 'sutra') setAgentActive(a.id, false); });
+  }
+  await scenarios[currentScenario]();
+}
+
+// ── Input Handling ──
+const inputField = document.getElementById('input-field');
+const sendBtn = document.getElementById('send-btn');
+
+function handleSend() {
+  const text = inputField.value.trim();
+  if (text) {
+    if (replyTarget) {
+      const agent = AGENTS.find(a => a.id === replyTarget);
+      addOutbound(`@${agent ? agent.name : replyTarget} — ${text}`);
+      clearReply();
+    } else {
+      addOutbound(text);
+    }
+    inputField.value = '';
+  }
+  // Always advance scenario on Enter
+  runNextScenario();
+}
+
+inputField.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    handleSend();
+  }
+  if (e.key === 'Escape') {
+    clearReply();
+  }
+});
+sendBtn.addEventListener('click', handleSend);
+
+// ── Init ──
+initOrbital();
+
+// Auto-start first scenario
+setTimeout(() => runNextScenario(), 600);
+</script>
+</body>
+</html>

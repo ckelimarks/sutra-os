@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sutra</title>
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --bg-block: #111111;
+    --border: #1a1a1a;
+    --text: #b0b0a8;
+    --text-dim: #555550;
+    --text-muted: #333330;
+    --green: #4af07a;
+    --green-dim: #4af07a30;
+    --amber: #e0a030;
+    --amber-dim: #e0a03030;
+    --cyan: #40c8d0;
+    --cyan-dim: #40c8d030;
+    --red: #e05050;
+    --red-dim: #e0505030;
+    --purple: #a080e0;
+    --purple-dim: #a080e030;
+    --white: #e0e0d8;
+    --prompt: #4af07a;
+  }
+
+  @font-face {
+    font-family: 'mono';
+    src: local('SF Mono'), local('Menlo'), local('Consolas'), local('Monaco');
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* === STATUS BAR === */
+  .status-bar {
+    height: 28px;
+    background: #080808;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    gap: 20px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+
+  .status-bar .sep {
+    color: var(--text-muted);
+  }
+
+  .status-bar .val {
+    color: var(--text);
+  }
+
+  .status-bar .val-green { color: var(--green); }
+  .status-bar .val-amber { color: var(--amber); }
+
+  .status-bar .right {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+  }
+
+  /* === SCANLINE === */
+  .scanline {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  }
+
+  /* === TERMINAL AREA === */
+  .terminal {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-track { background: transparent; }
+  .terminal::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 2px; }
+
+  /* === EXCHANGE BLOCK === */
+  .exchange {
+    margin-bottom: 20px;
+  }
+
+  .exchange.dimmed {
+    opacity: 0.35;
+  }
+
+  .exchange.dimmed:hover {
+    opacity: 0.7;
+  }
+
+  /* === USER INPUT LINE === */
+  .input-line {
+    display: flex;
+    gap: 0;
+    margin-bottom: 4px;
+  }
+
+  .prompt-char {
+    color: var(--prompt);
+    font-weight: 600;
+    white-space: pre;
+    user-select: none;
+  }
+
+  .user-text {
+    color: var(--white);
+  }
+
+  /* === RESPONSE BLOCK === */
+  .response {
+    margin-left: 0;
+    padding: 8px 0 8px 16px;
+    border-left: 2px solid var(--text-muted);
+    position: relative;
+  }
+
+  .response[data-agent="lovenotes"] { border-left-color: var(--red); }
+  .response[data-agent="content"] { border-left-color: var(--purple); }
+  .response[data-agent="continuum"] { border-left-color: var(--cyan); }
+  .response[data-agent="sutra"] { border-left-color: var(--green); }
+
+  .route-tag {
+    font-size: 11px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .route-tag .arrow {
+    color: var(--text-muted);
+  }
+
+  .route-tag .agent {
+    font-weight: 600;
+  }
+
+  .route-tag .model {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .response[data-agent="lovenotes"] .route-tag .agent { color: var(--red); }
+  .response[data-agent="content"] .route-tag .agent { color: var(--purple); }
+  .response[data-agent="continuum"] .route-tag .agent { color: var(--cyan); }
+  .response[data-agent="sutra"] .route-tag .agent { color: var(--green); }
+
+  .response-body {
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .response-body .highlight {
+    color: var(--white);
+    font-weight: 600;
+  }
+
+  .response-body .warn {
+    color: var(--amber);
+  }
+
+  .response-body .num {
+    color: var(--green);
+  }
+
+  .response-meta {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+  }
+
+  .response-meta .cost {
+    color: var(--text-dim);
+  }
+
+  /* === SPARKLINE === */
+  .sparkline {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  .sparkline-bar {
+    display: inline-block;
+    width: 2px;
+    margin-right: 1px;
+    background: var(--green);
+    opacity: 0.5;
+    vertical-align: bottom;
+  }
+
+  /* === SEPARATOR === */
+  .history-marker {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 10px;
+    margin: 12px 0 16px 0;
+    position: relative;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .history-marker::before,
+  .history-marker::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 60px);
+    height: 1px;
+    background: var(--text-muted);
+    opacity: 0.3;
+  }
+
+  .history-marker::before { left: 0; }
+  .history-marker::after { right: 0; }
+
+  /* === TAB COMPLETION PREVIEW === */
+  .tab-complete {
+    position: absolute;
+    bottom: 56px;
+    left: 20px;
+    right: 20px;
+    background: var(--bg-block);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    font-size: 11px;
+    display: none;
+    gap: 16px;
+    z-index: 10;
+  }
+
+  .tab-complete.visible {
+    display: flex;
+  }
+
+  .tab-option {
+    color: var(--text-dim);
+    padding: 2px 6px;
+  }
+
+  .tab-option.active {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  .tab-option .dim {
+    color: var(--text-muted);
+  }
+
+  /* === INPUT AREA === */
+  .input-area {
+    flex-shrink: 0;
+    padding: 0 20px 16px 20px;
+    position: relative;
+  }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: transparent;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  .input-prompt {
+    color: var(--prompt);
+    font-weight: 600;
+    white-space: pre;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--white);
+    caret-color: var(--green);
+    line-height: 1.6;
+  }
+
+  .input-field::placeholder {
+    color: var(--text-muted);
+  }
+
+  .cursor-block {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    background: var(--green);
+    opacity: 0.7;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+    flex-shrink: 0;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* === HELP OVERLAY === */
+  .help-overlay {
+    display: none;
+    position: fixed;
+    top: 28px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 50;
+    padding: 40px;
+    overflow-y: auto;
+  }
+
+  .help-overlay.visible { display: block; }
+
+  .help-content {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .help-content h2 {
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .help-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .help-row .cmd {
+    color: var(--white);
+    min-width: 200px;
+  }
+
+  .help-row .desc {
+    color: var(--text-dim);
+  }
+
+  .help-section {
+    margin-bottom: 24px;
+  }
+
+  /* === GRID BACKGROUND === */
+  .grid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image:
+      linear-gradient(var(--text-muted) 1px, transparent 1px),
+      linear-gradient(90deg, var(--text-muted) 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0.04;
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="scanline"></div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <span><span class="val-green">5</span> agents</span>
+  <span class="sep">|</span>
+  <span><span class="val-amber">1</span> busy</span>
+  <span class="sep">|</span>
+  <span><span class="val">$0.68</span> today<span class="sparkline" id="costSparkline"></span></span>
+  <span class="sep">|</span>
+  <span>no blockers</span>
+  <div class="right">
+    <span>sutra v0.1</span>
+    <span class="sep">|</span>
+    <span id="clock"></span>
+  </div>
+</div>
+
+<!-- TERMINAL -->
+<div class="terminal" id="terminal">
+
+  <!-- DIMMED / HISTORY -->
+  <div class="history-marker">history (2 prior)</div>
+
+  <div class="exchange dimmed">
+    <div class="input-line">
+      <span class="prompt-char">sutra > </span>
+      <span class="user-text">check lovenotes health</span>
+    </div>
+    <div class="response" data-agent="lovenotes">
+      <div class="route-tag">
+        <span class="arrow">[-></span>
+        <span class="agent">LoveNotes</span><span class="arrow">]</span>
+        <span class="model">sonnet</span>
+      </div>
+      <div class="response-body"><span class="num">14</span> couples active (<span class="num">5</span> paid). <span class="warn">2 partners stale >48hrs</span>: Sarah K. (couple #7),
+Mike R. (couple #12). No delivery failures.
+Trial conversion: <span class="warn">0/11</span> — v4.2 curriculum not yet deployed.
+
+Next action: ping stale partners or deploy v4.2?</div>
+      <div class="response-meta">
+        <span class="cost">$0.018</span>
+        <span>1.2s</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="exchange dimmed">
+    <div class="input-line">
+      <span class="prompt-char">sutra > </span>
+      <span class="user-text">draft a linkedin post about the geoint skill I built</span>
+    </div>
+    <div class="response" data-agent="content">
+      <div class="route-tag">
+        <span class="arrow">[-></span>
+        <span class="agent">ContentWriter</span><span class="arrow">]</span>
+        <span class="model">sonnet</span>
+      </div>
+      <div class="response-body">I built a personal intelligence briefing system this weekend.
+
+<span class="num">19</span> RSS feeds from defense, geopolitics, and climate sources.
+A haiku-class model fetches and filters (<span class="highlight">cheap</span>).
+An opus-class model analyzes and synthesizes (<span class="highlight">expensive</span>,
+but only runs on the filtered set).
+
+The result: a password-protected dashboard with a world map,
+hotspot tracking, and actionable prep recommendations.
+Updated daily.
+
+Why? Because "what's happening in the world" shouldn't require
+doomscrolling. It should be a structured briefing that respects
+your attention.
+
+The cost pattern — cheap models for ingestion, expensive models
+for analysis — works everywhere. Most of what AI does is plumbing.
+Save the intelligence for the last mile.</div>
+      <div class="response-meta">
+        <span class="cost">$0.012</span>
+        <span>2.8s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISIBLE / CURRENT -->
+  <div class="exchange">
+    <div class="input-line">
+      <span class="prompt-char">sutra > </span>
+      <span class="user-text">what did we decide about the auth middleware last week?</span>
+    </div>
+    <div class="response" data-agent="continuum">
+      <div class="route-tag">
+        <span class="arrow">[-></span>
+        <span class="agent">Continuum</span><span class="arrow">]</span>
+        <span class="model">haiku</span>
+      </div>
+      <div class="response-body">From your <span class="highlight">March 28</span> session:
+
+  decided to keep existing JWT middleware
+  + add refresh token rotation
+
+The old session-cookie approach was flagged by legal
+for compliance. You committed the plan but haven't
+started implementation.
+
+Status: <span class="warn">P2 in TASKS.md</span> — not yet started.</div>
+      <div class="response-meta">
+        <span class="cost">$0.002</span>
+        <span>0.4s</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="exchange">
+    <div class="input-line">
+      <span class="prompt-char">sutra > </span>
+      <span class="user-text">status</span>
+    </div>
+    <div class="response" data-agent="sutra">
+      <div class="route-tag">
+        <span class="arrow">[-></span>
+        <span class="agent">sutra</span><span class="arrow">]</span>
+        <span class="model">internal</span>
+      </div>
+      <div class="response-body"><span class="num">5</span> agents  <span class="val-green">4 idle</span>  <span class="val-amber">1 working</span>  $<span class="num">0.68</span> today
+
+  <span class="highlight">LoveNotes</span>     running health check      <span class="val-amber">2m ago</span>
+  ContentWriter  finished GEOINT draft      <span class="val-green">ready</span>
+  Continuum      last query: auth decision  <span class="val-green">idle</span>
+  JobSearch      no recent activity         <span class="val-green">idle</span>
+  Remington      no recent activity         <span class="val-green">idle</span>
+
+No blockers. No pending approvals.
+Nothing urgent.</div>
+      <div class="response-meta">
+        <span class="cost">$0.008</span>
+        <span>0.1s</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB COMPLETION -->
+<div class="tab-complete" id="tabComplete">
+  <span class="tab-option active">@lovenotes</span>
+  <span class="tab-option">@continuum</span>
+  <span class="tab-option">@content</span>
+  <span class="tab-option">@jobsearch</span>
+  <span class="tab-option">@remington</span>
+  <span class="tab-option dim">tab to cycle</span>
+</div>
+
+<!-- INPUT -->
+<div class="input-area">
+  <div class="input-row">
+    <span class="input-prompt">sutra > </span>
+    <input
+      class="input-field"
+      id="inputField"
+      type="text"
+      placeholder=""
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <span class="cursor-block" id="cursorBlock"></span>
+  </div>
+</div>
+
+<!-- HELP OVERLAY -->
+<div class="help-overlay" id="helpOverlay">
+  <div class="help-content">
+    <div class="help-section">
+      <h2>commands</h2>
+      <div class="help-row"><span class="cmd">status</span><span class="desc">agent overview, costs, blockers</span></div>
+      <div class="help-row"><span class="cmd">history</span><span class="desc">show full conversation scroll</span></div>
+      <div class="help-row"><span class="cmd">agents</span><span class="desc">list all agents and state</span></div>
+      <div class="help-row"><span class="cmd">cost</span><span class="desc">spending breakdown by agent</span></div>
+      <div class="help-row"><span class="cmd">clear</span><span class="desc">clear visible output</span></div>
+    </div>
+    <div class="help-section">
+      <h2>routing</h2>
+      <div class="help-row"><span class="cmd">@lovenotes [msg]</span><span class="desc">direct message to LoveNotes agent</span></div>
+      <div class="help-row"><span class="cmd">@continuum [msg]</span><span class="desc">direct message to Continuum agent</span></div>
+      <div class="help-row"><span class="cmd">[anything else]</span><span class="desc">sutra routes automatically</span></div>
+    </div>
+    <div class="help-section">
+      <h2>shortcuts</h2>
+      <div class="help-row"><span class="cmd">tab</span><span class="desc">cycle agent autocomplete</span></div>
+      <div class="help-row"><span class="cmd">ctrl+l</span><span class="desc">clear screen</span></div>
+      <div class="help-row"><span class="cmd">?</span><span class="desc">toggle this help</span></div>
+      <div class="help-row"><span class="cmd">esc</span><span class="desc">close help / cancel</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const input = document.getElementById('inputField');
+  const cursor = document.getElementById('cursorBlock');
+  const tabComplete = document.getElementById('tabComplete');
+  const helpOverlay = document.getElementById('helpOverlay');
+  const terminal = document.getElementById('terminal');
+
+  // Clock
+  function updateClock() {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    const s = now.getSeconds().toString().padStart(2, '0');
+    document.getElementById('clock').textContent = h + ':' + m + ':' + s;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Cost sparkline
+  (function buildSparkline() {
+    const el = document.getElementById('costSparkline');
+    const data = [2, 5, 3, 8, 4, 12, 6, 3, 9, 7, 4, 2];
+    const max = Math.max(...data);
+    data.forEach(v => {
+      const bar = document.createElement('span');
+      bar.className = 'sparkline-bar';
+      bar.style.height = Math.max(2, (v / max) * 10) + 'px';
+      el.appendChild(bar);
+    });
+  })();
+
+  // Focus input on click anywhere
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.help-overlay')) {
+      input.focus();
+    }
+  });
+
+  // Hide real cursor, show block cursor
+  input.addEventListener('focus', () => {
+    cursor.style.opacity = '0.7';
+  });
+
+  input.addEventListener('blur', () => {
+    cursor.style.opacity = '0.3';
+  });
+
+  // Tab completion
+  let tabIndex = 0;
+  const agents = ['@lovenotes', '@continuum', '@content', '@jobsearch', '@remington'];
+
+  input.addEventListener('input', () => {
+    const val = input.value;
+    if (val.startsWith('@') && val.length > 0 && val.length < 12) {
+      tabComplete.classList.add('visible');
+      // Highlight matching
+      const options = tabComplete.querySelectorAll('.tab-option:not(.dim)');
+      options.forEach(opt => {
+        opt.classList.remove('active');
+        if (opt.textContent.startsWith(val)) {
+          opt.classList.add('active');
+        }
+      });
+    } else {
+      tabComplete.classList.remove('visible');
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    // Tab completion
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (tabComplete.classList.contains('visible')) {
+        const options = tabComplete.querySelectorAll('.tab-option:not(.dim)');
+        options.forEach(o => o.classList.remove('active'));
+        tabIndex = (tabIndex + 1) % options.length;
+        options[tabIndex].classList.add('active');
+        input.value = options[tabIndex].textContent + ' ';
+      }
+    }
+
+    // Help toggle
+    if (e.key === '?' && input.value === '') {
+      e.preventDefault();
+      helpOverlay.classList.toggle('visible');
+    }
+
+    // Escape
+    if (e.key === 'Escape') {
+      helpOverlay.classList.remove('visible');
+      tabComplete.classList.remove('visible');
+    }
+
+    // Clear
+    if (e.ctrlKey && e.key === 'l') {
+      e.preventDefault();
+      terminal.querySelectorAll('.exchange').forEach(ex => {
+        ex.classList.add('dimmed');
+      });
+    }
+
+    // Enter - mock submit
+    if (e.key === 'Enter' && input.value.trim()) {
+      e.preventDefault();
+      const val = input.value.trim();
+      input.value = '';
+      tabComplete.classList.remove('visible');
+
+      // If "history" command, undim everything
+      if (val === 'history') {
+        terminal.querySelectorAll('.exchange.dimmed').forEach(ex => {
+          ex.classList.remove('dimmed');
+        });
+        const marker = terminal.querySelector('.history-marker');
+        if (marker) marker.style.display = 'none';
+        return;
+      }
+
+      // If "clear" command
+      if (val === 'clear') {
+        terminal.querySelectorAll('.exchange').forEach(ex => {
+          ex.classList.add('dimmed');
+        });
+        return;
+      }
+
+      // Add new exchange
+      const exchange = document.createElement('div');
+      exchange.className = 'exchange';
+      exchange.innerHTML =
+        '<div class="input-line">' +
+          '<span class="prompt-char">sutra > </span>' +
+          '<span class="user-text">' + escapeHtml(val) + '</span>' +
+        '</div>' +
+        '<div class="response" data-agent="sutra">' +
+          '<div class="route-tag">' +
+            '<span class="arrow">[-></span> ' +
+            '<span class="agent">sutra</span>' +
+            '<span class="arrow">]</span> ' +
+            '<span class="model">routing...</span>' +
+          '</div>' +
+          '<div class="response-body" style="color:var(--text-dim)">thinking...</div>' +
+        '</div>';
+      terminal.appendChild(exchange);
+      terminal.scrollTop = terminal.scrollHeight;
+
+      // Simulate response after delay
+      setTimeout(() => {
+        const resp = exchange.querySelector('.response-body');
+        const model = exchange.querySelector('.model');
+        resp.style.color = '';
+        resp.textContent = 'This is a mockup. In production, sutra would route\nyour message to the best agent and stream the response.';
+        model.textContent = 'sonnet';
+
+        const meta = document.createElement('div');
+        meta.className = 'response-meta';
+        meta.innerHTML = '<span class="cost">$0.00</span><span>mock</span>';
+        exchange.querySelector('.response').appendChild(meta);
+
+        terminal.scrollTop = terminal.scrollHeight;
+      }, 800);
+    }
+  });
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Auto-focus
+  input.focus();
+
+  // Scroll to bottom
+  terminal.scrollTop = terminal.scrollHeight;
+</script>
+
+</body>
+</html>

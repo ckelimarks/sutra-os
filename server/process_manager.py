@@ -235,7 +235,7 @@ class ProcessManager:
                 # - restricted: blocked at API level, never reaches here
                 if config.permission_tier == 'autonomous':
                     # Prototypes get full permissions — sandbox is the cwd boundary
-                    PROTO_PREFIX = "$SUTRA_PROJECT_ROOT/Projects/prototypes/"
+                    PROTO_PREFIX = "/Users/christopherk.marks/Downloads/personal-os-main/Projects/prototypes/"
                     if config.cwd.startswith(PROTO_PREFIX):
                         cmd.append("--dangerously-skip-permissions")
                     else:

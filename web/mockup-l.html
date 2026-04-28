@@ -1,0 +1,1507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sutra — Session Timeline</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-rail: #0d0d10;
+    --bg-lane: #111115;
+    --bg-lane-alt: #0e0e12;
+    --bg-block: #1a1a20;
+    --line: #1d1d24;
+    --line-strong: #262630;
+    --text: #e7e7ec;
+    --text-dim: #8a8a96;
+    --text-faint: #55555f;
+    --accent: #d8c9ff;
+    --sutra-a: #c9b8ff;
+    --sutra-b: #8e7dd6;
+    --playhead: #ffd36a;
+    --ok: #7ed6a8;
+    --warn: #ffb86b;
+    --err: #ff7a7a;
+
+    /* Agent palette — muted Logic Pro style */
+    --c-lovenotes: #e87a94;
+    --c-content: #6ab7e8;
+    --c-geoint:   #d89a5a;
+    --c-factory:  #9d7ee0;
+    --c-research: #7ed6a8;
+    --c-jobsearch:#e3c968;
+    --c-coder:    #5ea3d6;
+    --c-brandy:   #c17a5e;
+    --c-memory:   #8b8fa8;
+    --c-designer: #6b7080;
+
+    --track-h: 52px;
+    --rail-w: 220px;
+    --right-w: 220px;
+    --pxmin: 6; /* pixels per minute (default 30min zoom) */
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  .mono { font-family: "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace; }
+
+  /* ---------- App frame ---------- */
+  .app {
+    display: grid;
+    grid-template-rows: 40px 1fr 112px;
+    height: 100vh;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #111116 0%, #0b0b0f 100%);
+  }
+  .topbar .left { display: flex; gap: 12px; align-items: center; }
+  .topbar .logo {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .topbar .logo .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--sutra-a);
+    margin-right: 7px;
+    box-shadow: 0 0 8px var(--sutra-a);
+    vertical-align: 1px;
+  }
+  .topbar .crumbs {
+    color: var(--text-faint);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .topbar .right {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .topbar .stat { display: flex; gap: 6px; align-items: center; }
+  .topbar .stat b { color: var(--text); font-weight: 500; }
+
+  .icon-btn {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 180ms;
+  }
+  .icon-btn:hover { color: var(--text); border-color: #3a3a48; background: #15151c; }
+
+  /* ---------- Main body ---------- */
+  .body {
+    display: grid;
+    grid-template-columns: var(--rail-w) 1fr var(--right-w);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ---------- Left rail ---------- */
+  .rail {
+    background: var(--bg-rail);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sutra-node {
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 11px;
+    align-items: center;
+  }
+  .sutra-orb {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--sutra-a) 0%, var(--sutra-b) 60%, #3a2a6b 100%);
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 14px rgba(201, 184, 255, 0.35);
+  }
+  .sutra-orb::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid rgba(201, 184, 255, 0.35);
+    animation: sutra-pulse 2.8s ease-out infinite;
+  }
+  @keyframes sutra-pulse {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    100% { transform: scale(1.25); opacity: 0; }
+  }
+  .sutra-meta { min-width: 0; }
+  .sutra-meta .name {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .sutra-meta .sub {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+  .sutra-meta .sub .live { color: var(--ok); }
+
+  .rail-header {
+    padding: 9px 14px 7px;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .track-list {
+    overflow-y: auto;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a34 transparent;
+  }
+  .track-list::-webkit-scrollbar { width: 6px; }
+  .track-list::-webkit-scrollbar-thumb { background: #2a2a34; border-radius: 3px; }
+
+  .track-head {
+    height: var(--track-h);
+    padding: 0 12px 0 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 160ms;
+  }
+  .track-head:hover { background: #14141a; }
+  .track-head.solo { background: #16121d; }
+  .track-head .swatch {
+    width: 3px;
+    align-self: stretch;
+    margin: 8px 0;
+    border-radius: 2px;
+    background: var(--track-color, #555);
+    flex-shrink: 0;
+  }
+  .track-head .meta { flex: 1; min-width: 0; }
+  .track-head .meta .name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .track-head .meta .name .dotlet {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--track-color, #555);
+    flex-shrink: 0;
+  }
+  .track-head .meta .sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .track-head .cost {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .track-head .ctrl {
+    display: flex;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 160ms;
+  }
+  .track-head:hover .ctrl { opacity: 1; }
+  .track-head .ctrl button {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    border: none;
+    background: #1e1e26;
+    color: var(--text-dim);
+    font-size: 9px;
+    cursor: pointer;
+  }
+  .track-head .ctrl button:hover { color: var(--text); background: #2a2a34; }
+  .track-head .ctrl button.active { background: var(--sutra-b); color: #fff; }
+
+  .track-head .statlite {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-faint);
+  }
+  .track-head .statlite.active { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse-dot 1.6s ease-in-out infinite; }
+  .track-head .statlite.needs { background: var(--err); animation: pulse-dot 1s ease-in-out infinite; }
+  .track-head .statlite.queued { background: var(--warn); }
+  .track-head .statlite.idle { background: #2d2d36; }
+  @keyframes pulse-dot {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+  }
+
+  /* ---------- Timeline ---------- */
+  .timeline-wrap {
+    position: relative;
+    background: var(--bg);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ruler {
+    height: 36px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0f0f14 0%, #0b0b10 100%);
+    position: relative;
+    overflow: hidden;
+    cursor: ew-resize;
+    user-select: none;
+  }
+  .ruler .tick {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--line-strong);
+  }
+  .ruler .tick.major { background: #32323e; }
+  .ruler .tick .label {
+    position: absolute;
+    top: 10px;
+    left: 5px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .ruler .tick.major .label { color: var(--text); }
+  .ruler .now-marker {
+    position: absolute;
+    top: 6px;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--playhead);
+    filter: drop-shadow(0 0 4px rgba(255, 211, 106, 0.6));
+    z-index: 3;
+  }
+  .ruler .now-label {
+    position: absolute;
+    top: 18px;
+    transform: translateX(-50%);
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 9px;
+    color: var(--playhead);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    z-index: 3;
+  }
+
+  .lanes-scroll {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a34 transparent;
+  }
+  .lanes-scroll::-webkit-scrollbar { width: 8px; height: 10px; }
+  .lanes-scroll::-webkit-scrollbar-thumb { background: #2a2a34; border-radius: 4px; }
+  .lanes-scroll::-webkit-scrollbar-track { background: #0c0c10; }
+
+  .lanes {
+    position: relative;
+    min-width: 100%;
+  }
+  .lane {
+    height: var(--track-h);
+    border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+  .lane:nth-child(odd) { background: var(--bg-lane-alt); }
+  .lane:nth-child(even) { background: var(--bg-lane); }
+  .lane.soloed { opacity: 0.28; }
+  .lane.soloed.solo-target { opacity: 1; background: #14111a; }
+
+  /* grid lines every 5min behind blocks */
+  .lane-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--pxmin) * 5px - 1px),
+      rgba(255,255,255,0.025) calc(var(--pxmin) * 5px - 1px),
+      rgba(255,255,255,0.025) calc(var(--pxmin) * 5px)
+    );
+  }
+
+  /* Now playhead line */
+  .playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--playhead);
+    opacity: 0.65;
+    pointer-events: none;
+    z-index: 6;
+    box-shadow: 0 0 6px rgba(255, 211, 106, 0.35);
+    animation: playhead-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes playhead-pulse {
+    0%,100% { opacity: 0.45; }
+    50% { opacity: 0.85; }
+  }
+
+  /* ---------- Blocks ---------- */
+  .block {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    border-radius: 6px;
+    padding: 5px 8px 4px;
+    background: var(--block-bg, #1a1a20);
+    border: 1px solid var(--block-border, #2a2a34);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 180ms, box-shadow 180ms, border-color 180ms;
+    z-index: 2;
+  }
+  .block:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px var(--block-color, #555);
+    z-index: 5;
+  }
+  .block .title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+  }
+  .block .bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .block .tag {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 8.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .block .sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 7px;
+  }
+  .block .sparkline span {
+    width: 2px;
+    background: var(--block-color, #888);
+    opacity: 0.75;
+    border-radius: 0.5px;
+  }
+
+  /* Completed */
+  .block.done {
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--block-color, #555) 28%, #141418) 0%,
+      color-mix(in oklab, var(--block-color, #555) 14%, #101014) 100%);
+    border-color: color-mix(in oklab, var(--block-color, #555) 55%, #2a2a34);
+  }
+
+  /* Active */
+  .block.active {
+    background: linear-gradient(90deg,
+      color-mix(in oklab, var(--block-color, #555) 40%, #141418) 0%,
+      color-mix(in oklab, var(--block-color, #555) 22%, #141418) 100%);
+    border-color: color-mix(in oklab, var(--block-color, #555) 80%, #333);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--block-color, #555) 55%, transparent),
+                0 0 14px color-mix(in oklab, var(--block-color, #555) 22%, transparent);
+  }
+  .block.active::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--block-color, #555) 40%, transparent) 45%,
+      color-mix(in oklab, var(--block-color, #555) 18%, transparent) 50%,
+      transparent 100%);
+    background-size: 200% 100%;
+    animation: active-wash 3.2s linear infinite;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  @keyframes active-wash {
+    from { background-position: 200% 0; }
+    to { background-position: -100% 0; }
+  }
+  .block.active .title::after {
+    content: '';
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--block-color, #fff);
+    border-radius: 50%;
+    margin-left: 6px;
+    animation: dot-blink 1.2s ease-in-out infinite;
+    vertical-align: 1px;
+  }
+  @keyframes dot-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* Progress bar inside active block */
+  .block.active .progress {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+  }
+  .block.active .progress::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: var(--prog, 30%);
+    background: var(--block-color, #fff);
+    box-shadow: 0 0 6px var(--block-color, #fff);
+  }
+
+  /* Queued */
+  .block.queued {
+    background: transparent;
+    border: 1px dashed color-mix(in oklab, var(--block-color, #555) 50%, #333);
+  }
+  .block.queued .title { color: var(--text-dim); }
+
+  /* Needs input */
+  .block.needs {
+    border-color: var(--err);
+    box-shadow: 0 0 0 1px rgba(255,122,122,0.3), 0 0 14px rgba(255,122,122,0.18);
+    animation: needs-pulse 2s ease-in-out infinite;
+  }
+  @keyframes needs-pulse {
+    0%,100% { box-shadow: 0 0 0 1px rgba(255,122,122,0.3), 0 0 14px rgba(255,122,122,0.18); }
+    50% { box-shadow: 0 0 0 1px rgba(255,122,122,0.55), 0 0 22px rgba(255,122,122,0.35); }
+  }
+  .block.needs .badge-q {
+    position: absolute;
+    top: 4px; right: 5px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--err);
+    color: #1a0808;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* File chip at right edge */
+  .block .file-chip {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    height: 14px;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.45);
+    color: var(--text);
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .block .file-chip svg { width: 8px; height: 8px; }
+
+  /* Just-completed pulse */
+  .block.just-done {
+    animation: just-done 1.6s ease-out;
+  }
+  @keyframes just-done {
+    0% { box-shadow: 0 0 0 0 rgba(126,214,168,0), 0 0 0 1px transparent; }
+    30% { box-shadow: 0 0 0 4px rgba(126,214,168,0.25), 0 0 18px rgba(126,214,168,0.5); }
+    100% { box-shadow: 0 0 0 0 rgba(126,214,168,0), 0 0 0 0 transparent; }
+  }
+
+  /* Dispatch line (SVG overlay) */
+  .dispatch-svg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  /* ---------- Tooltip ---------- */
+  .tip {
+    position: fixed;
+    pointer-events: none;
+    background: #15151c;
+    border: 1px solid #2a2a36;
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-width: 240px;
+    max-width: 320px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 160ms, transform 160ms;
+  }
+  .tip.show { opacity: 1; transform: translateY(0); }
+  .tip .tip-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .tip .tip-sub { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; font-family: "SF Mono", ui-monospace, monospace; }
+  .tip .tip-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+  .tip .tip-row .k { color: var(--text-dim); }
+  .tip .tip-row .v { font-family: "SF Mono", ui-monospace, monospace; color: var(--text); }
+  .tip .tip-sep { height: 1px; background: #22222c; margin: 6px 0; }
+  .tip .tip-files { font-size: 10px; color: var(--text-dim); }
+  .tip .tip-files span { display: block; font-family: "SF Mono", ui-monospace, monospace; color: #c9b8ff; margin-top: 2px; }
+
+  /* ---------- Inline expand panel ---------- */
+  .expand-panel {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-height: 40%;
+    background: #111117;
+    border: 1px solid #2a2a36;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+    z-index: 20;
+    display: none;
+    overflow: auto;
+  }
+  .expand-panel.open { display: block; }
+  .expand-panel .xp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .expand-panel .xp-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .expand-panel .xp-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: "SF Mono", ui-monospace, monospace;
+    margin-top: 2px;
+  }
+  .expand-panel .xp-close {
+    color: var(--text-dim);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px;
+  }
+  .expand-panel .xp-close:hover { color: var(--text); }
+  .expand-panel .xp-body {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    font-family: "SF Mono", ui-monospace, monospace;
+  }
+
+  /* ---------- Right rail (attention queue) ---------- */
+  .aside {
+    background: var(--bg-rail);
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .aside .section-head {
+    padding: 11px 14px 8px;
+    border-bottom: 1px solid var(--line);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .aside .section-head .count {
+    background: #1e1e26;
+    color: var(--text);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .aside .q-list { overflow-y: auto; flex: 1; }
+  .q-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 160ms;
+    position: relative;
+  }
+  .q-item:hover { background: #14141a; }
+  .q-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--q-color, #555);
+  }
+  .q-item .q-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .q-item .q-agent {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .q-item .q-time {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 9px;
+    color: var(--text-faint);
+  }
+  .q-item .q-text {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .q-item.urgent .q-agent::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--err);
+    margin-right: 5px;
+    vertical-align: 1px;
+    box-shadow: 0 0 6px var(--err);
+    animation: pulse-dot 1.2s ease-in-out infinite;
+  }
+
+  /* ---------- Transport + Input bar ---------- */
+  .transport {
+    border-top: 1px solid var(--line);
+    background: linear-gradient(180deg, #0b0b10 0%, #070709 100%);
+    display: grid;
+    grid-template-rows: 52px 60px;
+  }
+  .transport-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .transport-row .group { display: flex; align-items: center; gap: 8px; }
+  .transport-row .sep { width: 1px; height: 22px; background: var(--line-strong); margin: 0 6px; }
+
+  .tbtn {
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong);
+    background: #0f0f14;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 160ms;
+  }
+  .tbtn:hover { color: var(--text); background: #16161e; border-color: #3a3a48; }
+  .tbtn.primary {
+    background: var(--sutra-b);
+    color: #fff;
+    border-color: var(--sutra-b);
+  }
+
+  .session-stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .session-stat b { color: var(--text); font-weight: 500; font-family: "SF Mono", ui-monospace, monospace; }
+
+  .zoom-group {
+    display: flex;
+    gap: 0;
+    background: #0f0f14;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .zoom-group button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-right: 1px solid var(--line-strong);
+    transition: all 160ms;
+  }
+  .zoom-group button:last-child { border-right: none; }
+  .zoom-group button:hover { color: var(--text); background: #16161e; }
+  .zoom-group button.active { background: var(--sutra-b); color: #fff; }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 12px;
+  }
+  .input-pill {
+    flex: 1;
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 40px;
+    border-radius: 999px;
+    background: #14141a;
+    border: 1px solid #24242e;
+    padding: 0 16px 0 14px;
+    transition: all 180ms;
+  }
+  .input-pill:focus-within {
+    border-color: var(--sutra-b);
+    background: #16161f;
+    box-shadow: 0 0 0 4px rgba(142, 125, 214, 0.12);
+  }
+  .input-pill .orb-s {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--sutra-a), var(--sutra-b) 70%);
+    box-shadow: 0 0 8px rgba(201,184,255,0.4);
+    flex-shrink: 0;
+  }
+  .input-pill input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+  .input-pill input::placeholder { color: var(--text-faint); }
+  .input-pill .kbd {
+    font-size: 9px;
+    color: var(--text-faint);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #0a0a10;
+    border: 1px solid #24242e;
+    font-family: "SF Mono", ui-monospace, monospace;
+  }
+  .input-pill .send {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--sutra-b);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .input-pill .send:hover { background: #a290e8; }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 820px) {
+    .body { grid-template-columns: 1fr; }
+    .rail, .aside { display: none; }
+    .transport { grid-template-rows: auto auto; }
+    .transport-row { flex-wrap: wrap; padding: 8px 10px; gap: 6px; }
+    .zoom-group button { padding: 5px 7px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ Topbar ============ -->
+  <div class="topbar">
+    <div class="left">
+      <div class="logo"><span class="dot"></span>SUTRA</div>
+      <div class="crumbs">Session &middot; 2026-04-08 &middot; Timeline View</div>
+    </div>
+    <div class="right">
+      <div class="stat"><span>Session</span><b class="mono">01:04:22</b></div>
+      <div class="stat"><span>Agents</span><b>10</b></div>
+      <div class="stat"><span>Working</span><b style="color:var(--ok)">4</b></div>
+      <div class="stat"><span>Cost</span><b class="mono">$2.47</b></div>
+      <button class="icon-btn" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ Body ============ -->
+  <div class="body">
+
+    <!-- ---------- Left rail ---------- -->
+    <div class="rail">
+      <div class="sutra-node">
+        <div class="sutra-orb"></div>
+        <div class="sutra-meta">
+          <div class="name">Sutra</div>
+          <div class="sub"><span class="live">●</span> orchestrator &middot; live</div>
+        </div>
+      </div>
+      <div class="rail-header"><span>TRACKS &middot; 10</span><span>COST</span></div>
+      <div class="track-list" id="trackList"></div>
+    </div>
+
+    <!-- ---------- Timeline ---------- -->
+    <div class="timeline-wrap">
+      <div class="ruler" id="ruler"></div>
+      <div class="lanes-scroll" id="lanesScroll">
+        <div class="lanes" id="lanes">
+          <svg class="dispatch-svg" id="dispatchSvg"></svg>
+          <div class="playhead" id="playhead"></div>
+        </div>
+      </div>
+      <div class="expand-panel" id="expandPanel">
+        <div class="xp-head">
+          <div>
+            <div class="xp-title" id="xpTitle">Task title</div>
+            <div class="xp-sub" id="xpSub">agent · duration · model</div>
+          </div>
+          <button class="xp-close" id="xpClose">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="xp-body" id="xpBody"></div>
+      </div>
+    </div>
+
+    <!-- ---------- Right rail (attention) ---------- -->
+    <div class="aside">
+      <div class="section-head"><span>ATTENTION</span><span class="count">3</span></div>
+      <div class="q-list" id="qList"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ Transport + Input ============ -->
+  <div class="transport">
+    <div class="transport-row">
+      <div class="group">
+        <button class="tbtn" title="Rewind">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4"/><rect x="5" y="4" width="2" height="16"/></svg>
+        </button>
+        <button class="tbtn primary" title="Play / Pause">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <button class="tbtn" title="Forward">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20"/><rect x="17" y="4" width="2" height="16"/></svg>
+        </button>
+        <div class="sep"></div>
+        <button class="tbtn" title="Snap to now" id="snapNow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </button>
+        <div class="session-stat"><span>NOW</span><b id="nowLabel">14:37:08</b></div>
+      </div>
+
+      <div class="group">
+        <div class="session-stat"><span>TOKENS</span><b class="mono">847.2k</b></div>
+        <div class="sep"></div>
+        <div class="session-stat"><span>VIEW</span></div>
+        <div class="zoom-group" id="zoomGroup">
+          <button data-zoom="5">5m</button>
+          <button data-zoom="15">15m</button>
+          <button data-zoom="30" class="active">30m</button>
+          <button data-zoom="60">1h</button>
+          <button data-zoom="240">4h</button>
+          <button data-zoom="1440">day</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-row">
+      <div class="input-pill">
+        <div class="orb-s"></div>
+        <input id="sutraInput" placeholder="Talk to Sutra…  dispatch, ask, redirect an agent" />
+        <span class="kbd">⌘K</span>
+        <button class="send" title="Send">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tooltip -->
+<div class="tip" id="tip"></div>
+
+<script>
+/* =====================================================================
+   Sutra — DAW Timeline mockup (mockup-l)
+   Time scale: pxmin px per minute. Default 30min view (6 px/min).
+   Origin: leftmost time marker = NOW - 50 minutes.
+   Window spans (NOW - 50) to (NOW + 30) = 80 minutes total.
+===================================================================== */
+
+const WINDOW_BEFORE = 50; // minutes before now
+const WINDOW_AFTER = 30;  // minutes after now
+const WINDOW_TOTAL = WINDOW_BEFORE + WINDOW_AFTER;
+
+let PX_PER_MIN = 12; // matches "30m" zoom preset
+
+const NOW_LABEL = "14:37:08";
+const NOW_MIN = WINDOW_BEFORE; // minutes from start of window
+
+// --- Agents (tracks) ---
+const AGENTS = [
+  { id: "lovenotes", name: "LoveNotes",   color: "var(--c-lovenotes)", status: "active",
+    current: "Debugging Twilio webhook timeout", cost: "$0.38" },
+  { id: "content",   name: "ContentWriter",color: "var(--c-content)",   status: "active",
+    current: "Drafting Reddit post batch (8/12)", cost: "$0.41" },
+  { id: "geoint",    name: "GEOINT",      color: "var(--c-geoint)",    status: "needs",
+    current: "Awaiting input — geofence bounds", cost: "$0.22" },
+  { id: "factory",   name: "App Factory",  color: "var(--c-factory)",   status: "active",
+    current: "Building app-7: prototype scaffold", cost: "$0.61" },
+  { id: "research",  name: "Researcher",   color: "var(--c-research)",  status: "idle",
+    current: "last: market report · 18m ago",  cost: "$0.12" },
+  { id: "jobsearch", name: "Job Search",   color: "var(--c-jobsearch)", status: "queued",
+    current: "queued: 3 follow-up drafts",      cost: "$0.08" },
+  { id: "coder",     name: "Coder",        color: "var(--c-coder)",     status: "active",
+    current: "Refactoring sutra/router.ts",     cost: "$0.33" },
+  { id: "brandy",    name: "Brandywine",   color: "var(--c-brandy)",    status: "active",
+    current: "Extracting 214pg PDF (p.88/214)", cost: "$0.24" },
+  { id: "memory",    name: "Memory",       color: "var(--c-memory)",    status: "idle",
+    current: "Continuum · auto-ingest",         cost: "$0.06" },
+  { id: "designer",  name: "Designer",     color: "var(--c-designer)",  status: "idle",
+    current: "idle",                             cost: "$0.02" },
+];
+
+// --- Blocks (tasks) ---
+// start/dur in minutes from window start. NOW is at minute WINDOW_BEFORE (50).
+const BLOCKS = [
+  // LoveNotes — 3 completed + 1 active
+  { agent:"lovenotes", start:2,  dur:6,  state:"done",   title:"Health check", model:"haiku",
+    tokens:{in:2400,out:640}, cost:0.04, files:["lovenotes-health-2026-04-08.md"],
+    body:"Checked 11 couples · 5 paid · no stale responses > 24h\nDelivery: 142/142 SMS sent · 0 failures\nCron jobs: all healthy\n\nNo action required." },
+  { agent:"lovenotes", start:10, dur:8,  state:"done",   title:"Daily cron run · evening prompts", model:"sonnet",
+    tokens:{in:5200,out:1800}, cost:0.09, files:[],
+    body:"Dispatched 11 prompts for 11 active couples.\nQueue cleared in 4.2s.\nNo rate-limit events." },
+  { agent:"lovenotes", start:20, dur:12, state:"done",   title:"Weekly report draft", model:"sonnet",
+    tokens:{in:12800,out:3400}, cost:0.18, files:["weekly-report-w14.md"],
+    body:"Summary: 11 couples · 5 paid · conversion still flat\nKey insight: 2 couples pausing — cite 'too easy' (v4.1 curriculum)\nRecommendation: ship v4.2 test cohort." },
+  { agent:"lovenotes", start:42, dur:14, state:"active", title:"Debugging Twilio webhook timeout", model:"sonnet",
+    tokens:{in:6400,out:1200}, cost:0.11, prog:58,
+    body:"Investigating 2 dropped SMS events from Twilio webhook.\nReproduced locally · seems to be 3s Supabase function cold-start.\nNext: add warmup ping cron." },
+
+  // ContentWriter — 1 big in-progress + 1 completed
+  { agent:"content", start:0,  dur:14, state:"done",   title:"Research: Reddit r/productivity trends", model:"sonnet",
+    tokens:{in:18200,out:2800}, cost:0.14, files:["content/research/reddit-trends.md"] },
+  { agent:"content", start:18, dur:32, state:"active", title:"Drafting Reddit post batch (8/12)", model:"sonnet",
+    tokens:{in:22400,out:9100}, cost:0.27, prog:67,
+    body:"Drafting 12 long-form posts for r/productivity, r/ADHD, r/GetMotivated.\n8 drafted · 4 remaining · ETA 12 min.\nStyle: first-person, no fluff, 400-600 words each." },
+
+  // GEOINT — 2 completed + 1 needs-input
+  { agent:"geoint", start:4,  dur:10, state:"done",  title:"Satellite ingest · Sentinel-2", model:"haiku",
+    tokens:{in:3200,out:400}, cost:0.03 },
+  { agent:"geoint", start:18, dur:18, state:"done",  title:"Hotspot detection sweep", model:"sonnet",
+    tokens:{in:14400,out:4200}, cost:0.19, files:["geoint/hotspots-20260408.geojson"] },
+  { agent:"geoint", start:40, dur:16, state:"needs", title:"Region bounds required", model:"—",
+    tokens:{in:0,out:0}, cost:0.00,
+    body:"Cannot proceed: need confirmation of AOI bounding box.\nOptions sent to attention queue:\n  A) Pacific NW (default)\n  B) Entire CONUS\n  C) Specify coords" },
+
+  // App Factory — 5 completed spanning whole timeline (parallel builds)
+  { agent:"factory", start:0,  dur:8,  state:"done", title:"app-3 · scaffold",  model:"haiku",  tokens:{in:2100,out:900}, cost:0.04 },
+  { agent:"factory", start:9,  dur:10, state:"done", title:"app-4 · routes",    model:"sonnet", tokens:{in:4800,out:2200}, cost:0.08 },
+  { agent:"factory", start:20, dur:9,  state:"done", title:"app-5 · auth flow", model:"sonnet", tokens:{in:5200,out:1800}, cost:0.09, files:["apps/app-5/"] },
+  { agent:"factory", start:30, dur:11, state:"done", title:"app-6 · DB schema", model:"sonnet", tokens:{in:6200,out:2400}, cost:0.11 },
+  { agent:"factory", start:42, dur:12, state:"active",title:"app-7 · prototype",model:"sonnet",tokens:{in:7100,out:2900},cost:0.13, prog:72 },
+
+  // Researcher — 1 completed
+  { agent:"research", start:10, dur:22, state:"done", title:"Market report · AI orchestration tools", model:"opus",
+    tokens:{in:28400,out:8200}, cost:0.42, files:["research/market-ai-orch.md"] },
+
+  // Job Search — 1 completed + 1 queued
+  { agent:"jobsearch", start:6, dur:12, state:"done",   title:"Outreach email drafts (×5)", model:"sonnet",
+    tokens:{in:6200,out:2800}, cost:0.10, files:["jobsearch/outreach-20260408.md"] },
+  { agent:"jobsearch", start:56, dur:10, state:"queued", title:"Follow-up drafts (3)",      model:"sonnet",
+    tokens:{in:0,out:0}, cost:0.00 },
+
+  // Coder — 2 completed + 1 active
+  { agent:"coder", start:2,  dur:10, state:"done",   title:"Fix: dispatch race condition", model:"sonnet",
+    tokens:{in:8400,out:2200}, cost:0.12, files:["sutra/router.ts"] },
+  { agent:"coder", start:14, dur:18, state:"done",   title:"Add: session writer hook",     model:"sonnet",
+    tokens:{in:11200,out:3800}, cost:0.16, files:["sutra/session.ts","sutra/hooks.ts"] },
+  { agent:"coder", start:42, dur:12, state:"active", title:"Refactor: router.ts",          model:"sonnet",
+    tokens:{in:9800,out:1600}, cost:0.14, prog:48 },
+
+  // Brandywine — 1 big active
+  { agent:"brandy", start:14, dur:42, state:"active", title:"PDF extract · 214pg research doc", model:"haiku",
+    tokens:{in:42000,out:6800}, cost:0.18, prog:41,
+    body:"Streaming extraction of 214-page PDF.\nCurrent: page 88/214 (41%)\nExtracted tables: 27\nExtracted figures: 14\nETA: ~14 min." },
+
+  // Memory — small periodic
+  { agent:"memory", start:3,  dur:2, state:"done", title:"ingest", model:"haiku", tokens:{in:800,out:200}, cost:0.01 },
+  { agent:"memory", start:13, dur:2, state:"done", title:"ingest", model:"haiku", tokens:{in:900,out:220}, cost:0.01 },
+  { agent:"memory", start:23, dur:2, state:"done", title:"ingest", model:"haiku", tokens:{in:850,out:210}, cost:0.01 },
+  { agent:"memory", start:33, dur:2, state:"done", title:"ingest", model:"haiku", tokens:{in:780,out:200}, cost:0.01 },
+  { agent:"memory", start:43, dur:2, state:"done", title:"ingest", model:"haiku", tokens:{in:820,out:200}, cost:0.01 },
+
+  // Designer — idle, no blocks
+];
+
+// --- Attention queue ---
+const ATTENTION = [
+  { agent:"GEOINT",    color:"var(--c-geoint)",  kind:"needs_input", time:"2m ago",  text:"Region bounds required — Pacific NW (default), CONUS, or custom?", urgent:true, blockIdx: 10 },
+  { agent:"LoveNotes", color:"var(--c-lovenotes)",kind:"needs_permission", time:"5m ago", text:"Push hotfix to production? (Twilio webhook retry)", urgent:true, blockIdx: 3 },
+  { agent:"Research",  color:"var(--c-research)",kind:"completed", time:"8m ago", text:"Market report complete — 14 pages, 2 key findings.", urgent:false, blockIdx: 16 },
+];
+
+/* ==================== Render ==================== */
+
+const trackListEl = document.getElementById("trackList");
+const lanesEl = document.getElementById("lanes");
+const rulerEl = document.getElementById("ruler");
+const qListEl = document.getElementById("qList");
+const dispatchSvg = document.getElementById("dispatchSvg");
+const playheadEl = document.getElementById("playhead");
+
+function fmtTokens(n) {
+  if (n >= 1000) return (n/1000).toFixed(1) + "k";
+  return String(n);
+}
+
+function renderTracks() {
+  trackListEl.innerHTML = AGENTS.map((a, i) => {
+    const statCls = a.status === "active" ? "active"
+                  : a.status === "needs" ? "needs"
+                  : a.status === "queued" ? "queued" : "idle";
+    return `
+      <div class="track-head" data-agent="${a.id}" style="--track-color:${a.color}">
+        <div class="swatch"></div>
+        <div class="meta">
+          <div class="name"><span class="dotlet"></span>${a.name}</div>
+          <div class="sub">${a.current}</div>
+        </div>
+        <div class="ctrl">
+          <button title="Pin">P</button>
+          <button title="Mute">M</button>
+          <button title="Solo">S</button>
+        </div>
+        <div class="cost mono">${a.cost}</div>
+        <div class="statlite ${statCls}"></div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderLanes() {
+  // remove any existing lane divs but keep svg + playhead
+  [...lanesEl.querySelectorAll(".lane")].forEach(n => n.remove());
+
+  const totalW = WINDOW_TOTAL * PX_PER_MIN;
+  lanesEl.style.width = totalW + "px";
+  lanesEl.style.height = (AGENTS.length * 52) + "px";
+
+  AGENTS.forEach((a, i) => {
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    lane.dataset.agent = a.id;
+    lane.style.top = (i * 52) + "px";
+    lane.style.left = "0";
+    lane.style.right = "0";
+    lane.style.position = "absolute";
+    lane.style.width = totalW + "px";
+
+    const grid = document.createElement("div");
+    grid.className = "lane-grid";
+    lane.appendChild(grid);
+
+    // blocks for this agent
+    BLOCKS.forEach((b, bi) => {
+      if (b.agent !== a.id) return;
+      const el = document.createElement("div");
+      el.className = "block " + b.state;
+      el.style.left = (b.start * PX_PER_MIN) + "px";
+      el.style.width = (b.dur * PX_PER_MIN - 2) + "px";
+      el.style.setProperty("--block-color", a.color);
+      el.dataset.idx = bi;
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "title";
+      titleEl.textContent = b.title;
+
+      const bottom = document.createElement("div");
+      bottom.className = "bottom";
+
+      const tagEl = document.createElement("div");
+      tagEl.className = "tag";
+      tagEl.textContent = b.model + (b.tokens.in+b.tokens.out > 0 ? " · " + fmtTokens(b.tokens.in + b.tokens.out) : "");
+
+      const spark = document.createElement("div");
+      spark.className = "sparkline";
+      const total = b.tokens.in + b.tokens.out;
+      const bars = 7;
+      for (let k=0;k<bars;k++) {
+        const s = document.createElement("span");
+        const h = total > 0 ? Math.max(2, Math.round(Math.random() * 7)) : 1;
+        s.style.height = h + "px";
+        spark.appendChild(s);
+      }
+
+      bottom.appendChild(tagEl);
+      bottom.appendChild(spark);
+      el.appendChild(titleEl);
+      el.appendChild(bottom);
+
+      // badge for needs-input
+      if (b.state === "needs") {
+        const q = document.createElement("div");
+        q.className = "badge-q";
+        q.textContent = "?";
+        el.appendChild(q);
+      }
+
+      // progress bar for active
+      if (b.state === "active") {
+        const p = document.createElement("div");
+        p.className = "progress";
+        p.style.setProperty("--prog", (b.prog || 35) + "%");
+        el.appendChild(p);
+      }
+
+      // file chip for done blocks
+      if (b.files && b.files.length > 0 && b.state === "done" && b.dur * PX_PER_MIN > 110) {
+        const chip = document.createElement("div");
+        chip.className = "file-chip";
+        chip.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${b.files.length}`;
+        el.appendChild(chip);
+      }
+
+      lane.appendChild(el);
+    });
+
+    lanesEl.appendChild(lane);
+  });
+
+  // Position playhead + dispatch svg
+  playheadEl.style.left = (NOW_MIN * PX_PER_MIN) + "px";
+  dispatchSvg.setAttribute("width", totalW);
+  dispatchSvg.setAttribute("height", AGENTS.length * 52);
+}
+
+function renderRuler() {
+  rulerEl.innerHTML = "";
+  const totalW = WINDOW_TOTAL * PX_PER_MIN;
+  const inner = document.createElement("div");
+  inner.style.position = "absolute";
+  inner.style.top = "0"; inner.style.bottom = "0"; inner.style.left = "0";
+  inner.style.width = totalW + "px";
+
+  // ticks every 5 min, major every 15
+  for (let m = 0; m <= WINDOW_TOTAL; m += 5) {
+    const t = document.createElement("div");
+    t.className = "tick" + (m % 15 === 0 ? " major" : "");
+    t.style.left = (m * PX_PER_MIN) + "px";
+    const rel = m - NOW_MIN;
+    if (m % 15 === 0) {
+      const lab = document.createElement("div");
+      lab.className = "label";
+      if (rel === 0) lab.textContent = "NOW";
+      else if (rel < 0) lab.textContent = rel + "m";
+      else lab.textContent = "+" + rel + "m";
+      t.appendChild(lab);
+    }
+    inner.appendChild(t);
+  }
+
+  // NOW marker
+  const marker = document.createElement("div");
+  marker.className = "now-marker";
+  marker.style.left = (NOW_MIN * PX_PER_MIN) + "px";
+  inner.appendChild(marker);
+
+  const nowLab = document.createElement("div");
+  nowLab.className = "now-label";
+  nowLab.style.left = (NOW_MIN * PX_PER_MIN) + "px";
+  nowLab.textContent = NOW_LABEL;
+  inner.appendChild(nowLab);
+
+  rulerEl.appendChild(inner);
+}
+
+function renderAttention() {
+  qListEl.innerHTML = ATTENTION.map((q, i) => `
+    <div class="q-item ${q.urgent ? 'urgent':''}" data-idx="${i}" style="--q-color:${q.color}">
+      <div class="q-head">
+        <div class="q-agent">${q.agent}</div>
+        <div class="q-time">${q.time}</div>
+      </div>
+      <div class="q-text">${q.text}</div>
+    </div>
+  `).join("");
+}
+
+/* Sync scroll between ruler and lanes */
+const lanesScrollEl = document.getElementById("lanesScroll");
+lanesScrollEl.addEventListener("scroll", () => {
+  rulerEl.scrollLeft = lanesScrollEl.scrollLeft;
+  // Also update ruler translate since ruler is overflow hidden
+  const inner = rulerEl.querySelector("div");
+  if (inner) inner.style.transform = `translateX(${-lanesScrollEl.scrollLeft}px)`;
+});
+
+/* Snap to now */
+document.getElementById("snapNow").addEventListener("click", () => {
+  const rect = lanesScrollEl.getBoundingClientRect();
+  const target = (NOW_MIN * PX_PER_MIN) - rect.width / 2;
+  lanesScrollEl.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+});
+
+/* Keyboard: space to snap to now */
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && e.target.tagName !== "INPUT") {
+    e.preventDefault();
+    document.getElementById("snapNow").click();
+  }
+  if (e.key === "Escape") closePanel();
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    document.getElementById("sutraInput").focus();
+  }
+});
+
+/* Zoom */
+document.getElementById("zoomGroup").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#zoomGroup button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  const zoom = parseInt(btn.dataset.zoom, 10);
+  // Map preset → px/min
+  const map = { 5: 72, 15: 24, 30: 12, 60: 6, 240: 2, 1440: 0.5 };
+  PX_PER_MIN = map[zoom] || 12;
+  document.documentElement.style.setProperty("--pxmin", PX_PER_MIN);
+  renderRuler();
+  renderLanes();
+  // sync scroll
+  const inner = rulerEl.querySelector("div");
+  if (inner) inner.style.transform = `translateX(${-lanesScrollEl.scrollLeft}px)`;
+});
+
+/* Tooltip */
+const tip = document.getElementById("tip");
+function showTip(block, ev) {
+  const b = BLOCKS[block.dataset.idx];
+  const a = AGENTS.find(x => x.id === b.agent);
+  const totalTok = b.tokens.in + b.tokens.out;
+  const files = (b.files && b.files.length)
+    ? `<div class="tip-sep"></div><div class="tip-files">FILES<span>${b.files.join("</span><span>")}</span></div>`
+    : "";
+  tip.innerHTML = `
+    <div class="tip-title">${b.title}</div>
+    <div class="tip-sub">${a.name} · ${b.state.toUpperCase()} · ${b.dur}m</div>
+    <div class="tip-row"><span class="k">Model</span><span class="v">${b.model}</span></div>
+    <div class="tip-row"><span class="k">Tokens in</span><span class="v">${fmtTokens(b.tokens.in)}</span></div>
+    <div class="tip-row"><span class="k">Tokens out</span><span class="v">${fmtTokens(b.tokens.out)}</span></div>
+    <div class="tip-row"><span class="k">Total</span><span class="v">${fmtTokens(totalTok)}</span></div>
+    <div class="tip-row"><span class="k">Cost</span><span class="v">$${b.cost.toFixed(2)}</span></div>
+    ${files}
+  `;
+  tip.classList.add("show");
+  const rect = block.getBoundingClientRect();
+  const tw = 280;
+  let x = rect.left + rect.width / 2 - tw / 2;
+  let y = rect.bottom + 8;
+  if (y + 200 > window.innerHeight) y = rect.top - 210;
+  x = Math.max(10, Math.min(x, window.innerWidth - tw - 10));
+  tip.style.left = x + "px";
+  tip.style.top = y + "px";
+}
+function hideTip() { tip.classList.remove("show"); }
+
+/* Click to expand */
+const expandPanel = document.getElementById("expandPanel");
+function openPanel(block) {
+  const b = BLOCKS[block.dataset.idx];
+  const a = AGENTS.find(x => x.id === b.agent);
+  document.getElementById("xpTitle").textContent = b.title;
+  document.getElementById("xpSub").textContent =
+    `${a.name}  ·  ${b.dur}m  ·  ${b.model}  ·  ${fmtTokens(b.tokens.in + b.tokens.out)} tokens  ·  $${b.cost.toFixed(2)}`;
+  document.getElementById("xpBody").textContent = b.body || "(No output captured — this block has no expanded detail yet.)";
+  expandPanel.classList.add("open");
+}
+function closePanel() { expandPanel.classList.remove("open"); }
+document.getElementById("xpClose").addEventListener("click", closePanel);
+
+/* Delegation via event */
+lanesEl.addEventListener("mouseover", (e) => {
+  const b = e.target.closest(".block");
+  if (b) showTip(b, e);
+});
+lanesEl.addEventListener("mouseout", (e) => {
+  if (e.target.closest(".block")) hideTip();
+});
+lanesEl.addEventListener("click", (e) => {
+  const b = e.target.closest(".block");
+  if (b) openPanel(b);
+});
+
+/* Solo by clicking track header */
+trackListEl.addEventListener("click", (e) => {
+  const head = e.target.closest(".track-head");
+  if (!head) return;
+  if (e.target.closest(".ctrl")) return;
+  const id = head.dataset.agent;
+  const currentlySoloed = head.classList.contains("solo");
+  document.querySelectorAll(".track-head").forEach(h => h.classList.remove("solo"));
+  document.querySelectorAll(".lane").forEach(l => l.classList.remove("soloed", "solo-target"));
+  if (!currentlySoloed) {
+    head.classList.add("solo");
+    document.querySelectorAll(".lane").forEach(l => {
+      l.classList.add("soloed");
+      if (l.dataset.agent === id) l.classList.add("solo-target");
+    });
+  }
+});
+
+/* Attention queue click → scroll to block */
+qListEl.addEventListener("click", (e) => {
+  const item = e.target.closest(".q-item");
+  if (!item) return;
+  const q = ATTENTION[parseInt(item.dataset.idx, 10)];
+  const b = BLOCKS[q.blockIdx];
+  if (!b) return;
+  const rect = lanesScrollEl.getBoundingClientRect();
+  const target = (b.start * PX_PER_MIN) - rect.width / 3;
+  lanesScrollEl.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+});
+
+/* Simulated dispatch line animation on Sutra input send */
+function animateDispatch(targetAgentId) {
+  const idx = AGENTS.findIndex(a => a.id === targetAgentId);
+  if (idx < 0) return;
+  const y = idx * 52 + 26;
+  const xStart = Math.max(0, (NOW_MIN * PX_PER_MIN) - 40);
+  const xEnd = (NOW_MIN * PX_PER_MIN) + 4;
+
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", xStart);
+  line.setAttribute("y1", y);
+  line.setAttribute("x2", xStart);
+  line.setAttribute("y2", y);
+  line.setAttribute("stroke", "var(--sutra-a)");
+  line.setAttribute("stroke-width", "1.5");
+  line.setAttribute("stroke-dasharray", "3 3");
+  line.style.filter = "drop-shadow(0 0 4px var(--sutra-a))";
+  dispatchSvg.appendChild(line);
+  let t = 0;
+  const anim = () => {
+    t += 0.08;
+    const x = xStart + (xEnd - xStart) * Math.min(1, t);
+    line.setAttribute("x2", x);
+    if (t < 1) requestAnimationFrame(anim);
+    else setTimeout(() => line.remove(), 600);
+  };
+  anim();
+}
+
+/* Simulate on submit */
+document.getElementById("sutraInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.currentTarget.value.trim()) {
+    const text = e.currentTarget.value.trim();
+    // naive agent match
+    let target = "coder";
+    const lower = text.toLowerCase();
+    if (lower.includes("love")) target = "lovenotes";
+    else if (lower.includes("content") || lower.includes("post")) target = "content";
+    else if (lower.includes("geo")) target = "geoint";
+    else if (lower.includes("research")) target = "research";
+    else if (lower.includes("job")) target = "jobsearch";
+    else if (lower.includes("pdf") || lower.includes("brand")) target = "brandy";
+    animateDispatch(target);
+    e.currentTarget.value = "";
+  }
+});
+
+/* Init */
+renderTracks();
+renderRuler();
+renderLanes();
+renderAttention();
+
+/* Start scroll position centered on NOW-ish */
+setTimeout(() => {
+  const rect = lanesScrollEl.getBoundingClientRect();
+  const target = (NOW_MIN * PX_PER_MIN) - rect.width * 0.65;
+  lanesScrollEl.scrollLeft = Math.max(0, target);
+  const inner = rulerEl.querySelector("div");
+  if (inner) inner.style.transform = `translateX(${-lanesScrollEl.scrollLeft}px)`;
+}, 50);
+
+/* Periodic dispatch pulse for ambience */
+setInterval(() => {
+  const pool = ["coder","factory","content","memory"];
+  animateDispatch(pool[Math.floor(Math.random()*pool.length)]);
+}, 7000);
+</script>
+</body>
+</html>

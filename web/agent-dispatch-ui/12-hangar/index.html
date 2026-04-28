@@ -965,7 +965,7 @@ const AGENT_TYPES = {
   scout:    { name: 'Scout',    spec: 'Recon',     icon: 'scout',    affinity: 'research' },
   research: { name: 'Research', spec: 'Deep dive', icon: 'research', affinity: 'research' },
   writer:   { name: 'Writer',   spec: 'Drafting',  icon: 'writer',   affinity: 'content' },
-  ops:      { name: 'Ops',      spec: 'Systems',   icon: 'ops',      affinity: 'cpa' },
+  ops:      { name: 'Ops',      spec: 'Systems',   icon: 'ops',      affinity: 'lovenotes' },
   fixer:    { name: 'Fixer',    spec: 'Logistics', icon: 'fixer',    affinity: 'life' },
   analyst:  { name: 'Analyst',  spec: 'Metrics',   icon: 'analyst',  affinity: 'hg' },
   courier:  { name: 'Courier',  spec: 'Routing',   icon: 'courier',  affinity: 'life' },
@@ -973,7 +973,7 @@ const AGENT_TYPES = {
 
 // ---------- Life areas ----------
 const TARGETS = [
-  { id: 'cpa', name: 'CPA',  code: 'LN',  marker: 'ln',   affinity: 'cpa', tag: 'AI message' },
+  { id: 'lovenotes', name: 'LoveNotes',  code: 'LN',  marker: 'ln',   affinity: 'lovenotes', tag: 'AI SMS' },
   { id: 'hg',        name: 'HG',         code: 'HG',  marker: 'hg',   affinity: 'hg',        tag: 'Coaching' },
   { id: 'content',   name: 'Content',    code: 'CT',  marker: 'ct',   affinity: 'content',   tag: 'Writing' },
   { id: 'life',      name: 'Life',       code: 'LF',  marker: 'life', affinity: 'life',      tag: 'Personal' },
@@ -1033,14 +1033,14 @@ function seedDeployed(typeKey, targetId, task, progress, blocked) {
     startedAt: Date.now(),
   });
 }
-seedDeployed('ops', 'cpa', 'Tune message send-rate throttle', 0.64, false);
+seedDeployed('ops', 'lovenotes', 'Tune SMS send-rate throttle', 0.64, false);
 seedDeployed('research', 'hg', 'Benchmark coaching intake forms', 0.38, false);
 
 // One in "needs input" state
 seedDeployed('writer', 'content', 'Draft Q2 essay on deploy mechanics', 0.55, true);
 
 // Seed queues
-state.queues.cpa.push('QA inbound webhook retries');
+state.queues.lovenotes.push('QA inbound webhook retries');
 state.queues.life.push('Book dentist appt');
 state.queues.content.push('Outline newsletter #12');
 
@@ -1588,7 +1588,7 @@ dispatchInput.addEventListener('keydown', e => {
 
 function guessTarget(txt) {
   const l = txt.toLowerCase();
-  if (/\b(sms|ln|cpa|webhook|webhook)\b/.test(l)) return 'cpa';
+  if (/\b(sms|ln|lovenotes|webhook|twilio)\b/.test(l)) return 'lovenotes';
   if (/\b(coach|hg|client|intake|okr)\b/.test(l)) return 'hg';
   if (/\b(essay|newsletter|draft|post|write|content)\b/.test(l)) return 'content';
   if (/\b(dentist|appt|book|laptop|household|life|vendor|grocery)\b/.test(l)) return 'life';

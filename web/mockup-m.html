@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sutra — Minimal Timeline</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-elev: #111114;
+    --bg-elev-2: #16161b;
+    --border: #1e1e25;
+    --border-soft: #16161c;
+    --text: #e8e8ec;
+    --text-dim: #8a8a94;
+    --text-faint: #4a4a54;
+    --sutra: #8b5cf6;
+    --sutra-glow: rgba(139, 92, 246, 0.45);
+
+    /* Muted, Logic-Pro style agent colors */
+    --c-lovenotes: #e8a87c;    /* peach */
+    --c-content: #7ec4b8;      /* sage teal */
+    --c-geoint: #c89b7b;       /* warm tan */
+    --c-coder: #9bb5d9;        /* slate blue */
+    --c-brandywine: #c57b9c;   /* mauve */
+    --c-memory: #a3a38f;       /* muted olive */
+
+    --row-h: 60px;
+    --row-gap: 16px;
+    --label-w: 140px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+  }
+
+  .mono { font-family: "SF Mono", "JetBrains Mono", Menlo, monospace; }
+
+  /* ---------- APP SHELL ---------- */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ---------- HEADER ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--sutra);
+    box-shadow: 0 0 12px var(--sutra-glow);
+    animation: dotPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 12px var(--sutra-glow); }
+    50% { box-shadow: 0 0 20px var(--sutra-glow), 0 0 32px rgba(139, 92, 246, 0.2); }
+  }
+
+  .brand-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-sub {
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-left: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* Attention pill */
+  .attention-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 13px;
+    background: rgba(232, 168, 124, 0.08);
+    border: 1px solid rgba(232, 168, 124, 0.25);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s;
+    font-size: 12px;
+    color: #e8a87c;
+  }
+  .attention-pill:hover { background: rgba(232, 168, 124, 0.14); }
+  .attention-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #e8a87c;
+  }
+
+  /* View switcher */
+  .view-switch {
+    display: flex;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .view-switch a {
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .view-switch a:hover { color: var(--text); }
+  .view-switch a.active {
+    background: var(--bg-elev-2);
+    color: var(--text);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  /* ---------- TOOLBAR ---------- */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 28px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+  }
+
+  .time-range {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .time-range .sep { color: var(--text-faint); margin: 0 8px; }
+
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .zoom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .zoom label {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .zoom input[type="range"] {
+    -webkit-appearance: none;
+    width: 140px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  .zoom input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    cursor: pointer;
+  }
+  .zoom input[type="range"]::-webkit-slider-thumb:hover { background: var(--text); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn:hover { color: var(--text); border-color: #2a2a33; }
+  .btn svg { width: 13px; height: 13px; }
+
+  /* ---------- TIMELINE ---------- */
+  .timeline-wrap {
+    flex: 1;
+    overflow: auto;
+    padding: 24px 28px 0 28px;
+    position: relative;
+  }
+
+  .timeline-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+  .timeline-wrap::-webkit-scrollbar-track { background: transparent; }
+  .timeline-wrap::-webkit-scrollbar-thumb { background: #1c1c23; border-radius: 4px; }
+
+  .timeline {
+    position: relative;
+    min-width: 1200px;
+  }
+
+  /* Time ruler (subtle) */
+  .ruler {
+    display: flex;
+    height: 24px;
+    margin-left: var(--label-w);
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .ruler .tick {
+    flex: 1;
+    position: relative;
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: "SF Mono", Menlo, monospace;
+    padding-left: 6px;
+    padding-top: 4px;
+  }
+  .ruler .tick::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 6px;
+    background: #1e1e25;
+  }
+
+  /* Subtle major gridlines overlay */
+  .grid-overlay {
+    position: absolute;
+    top: 38px;
+    left: var(--label-w);
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    display: flex;
+  }
+  .grid-overlay .gline {
+    flex: 1;
+    border-left: 1px solid rgba(255,255,255,0.025);
+  }
+  .grid-overlay .gline:first-child { border-left: none; }
+
+  /* ---------- SUTRA BUS ROW ---------- */
+  .sutra-row {
+    display: flex;
+    align-items: stretch;
+    margin-bottom: 18px;
+    position: relative;
+    height: 48px;
+  }
+
+  .sutra-label {
+    width: var(--label-w);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 14px;
+  }
+
+  .sutra-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(139, 92, 246, 0.06));
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.12);
+    width: 100%;
+  }
+  .sutra-badge .ring {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--sutra) 0%, rgba(139,92,246,0.4) 60%, transparent 100%);
+    box-shadow: 0 0 10px var(--sutra-glow);
+    animation: ringPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.85; }
+  }
+  .sutra-badge .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #d8cfff;
+    letter-spacing: 0.02em;
+  }
+
+  .sutra-bus {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.07), rgba(139, 92, 246, 0.02));
+    border: 1px solid rgba(139, 92, 246, 0.18);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sutra-bus::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(139, 92, 246, 0.06) 50%,
+      transparent 100%);
+    animation: busShimmer 6s ease-in-out infinite;
+  }
+  @keyframes busShimmer {
+    0%, 100% { transform: translateX(-30%); opacity: 0.4; }
+    50% { transform: translateX(30%); opacity: 0.9; }
+  }
+  .sutra-bus .bus-caption {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: rgba(216, 207, 255, 0.55);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  /* Dispatch origin markers on the bus */
+  .dispatch-origin {
+    position: absolute;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sutra);
+    box-shadow: 0 0 8px var(--sutra-glow);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Dispatch lines — SVG overlay */
+  .dispatch-svg {
+    position: absolute;
+    top: 38px; /* under ruler */
+    left: var(--label-w);
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .dispatch-line {
+    stroke: rgba(139, 92, 246, 0.35);
+    stroke-width: 1;
+    fill: none;
+    stroke-dasharray: 2 3;
+    animation: dispatchFade 5s ease-in-out infinite;
+  }
+  .dispatch-line.d2 { animation-delay: 1.4s; }
+  .dispatch-line.d3 { animation-delay: 2.8s; }
+  .dispatch-line.d4 { animation-delay: 3.6s; }
+  @keyframes dispatchFade {
+    0%, 80%, 100% { opacity: 0; }
+    10%, 30% { opacity: 0.85; }
+  }
+
+  /* ---------- AGENT LANES ---------- */
+  .lanes {
+    position: relative;
+  }
+
+  .lane {
+    display: flex;
+    align-items: center;
+    height: var(--row-h);
+    margin-bottom: var(--row-gap);
+    position: relative;
+  }
+
+  .lane-label {
+    width: var(--label-w);
+    padding-right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .agent-swatch {
+    width: 3px;
+    height: 22px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .lane-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .lane-sub {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .lane-name-wrap { display: flex; flex-direction: column; }
+
+  .lane-track {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    background: rgba(255,255,255,0.012);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.018);
+  }
+
+  /* Hover lane controls (hidden by default) */
+  .lane-ctrls {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 3;
+  }
+  .lane:hover .lane-ctrls { opacity: 1; }
+  .lane-ctrls button {
+    width: 22px; height: 22px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lane-ctrls button:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+  .lane-ctrls svg { width: 11px; height: 11px; }
+
+  /* ---------- BLOCKS ---------- */
+  .block {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    border-radius: 5px;
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  .block:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
+    z-index: 5;
+  }
+  .block .task-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(0,0,0,0.85);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .block .duration {
+    font-size: 10px;
+    font-family: "SF Mono", Menlo, monospace;
+    color: rgba(0,0,0,0.55);
+    align-self: flex-end;
+  }
+
+  /* Block states */
+  .block.done { border: 1px solid rgba(0,0,0,0.25); }
+  .block.active {
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 0 16px rgba(255,255,255,0.08);
+    animation: activePulse 2.2s ease-in-out infinite;
+  }
+  @keyframes activePulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.10), 0 0 14px rgba(255,255,255,0.08); }
+    50% { box-shadow: 0 0 0 1px rgba(255,255,255,0.22), 0 0 24px rgba(255,255,255,0.18); }
+  }
+  .block.paused {
+    border: 1px dashed rgba(255,255,255,0.55);
+    filter: saturate(0.55) brightness(0.85);
+  }
+  .block.paused .task-name { color: rgba(0,0,0,0.7); }
+
+  /* Paused connector line (between split blocks) */
+  .pause-connector {
+    position: absolute;
+    top: 50%;
+    height: 1px;
+    border-top: 1px dashed rgba(255,255,255,0.22);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Agent color classes */
+  .bg-lovenotes { background: var(--c-lovenotes); }
+  .bg-content   { background: var(--c-content); }
+  .bg-geoint    { background: var(--c-geoint); }
+  .bg-coder     { background: var(--c-coder); }
+  .bg-brandywine{ background: var(--c-brandywine); }
+  .bg-memory    { background: var(--c-memory); }
+
+  .swatch-lovenotes { background: var(--c-lovenotes); }
+  .swatch-content   { background: var(--c-content); }
+  .swatch-geoint    { background: var(--c-geoint); }
+  .swatch-coder     { background: var(--c-coder); }
+  .swatch-brandywine{ background: var(--c-brandywine); }
+  .swatch-memory    { background: var(--c-memory); }
+
+  /* Playhead */
+  .playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.0) 0%,
+      rgba(255,255,255,0.35) 10%,
+      rgba(255,255,255,0.35) 90%,
+      rgba(255,255,255,0.0) 100%);
+    pointer-events: none;
+    z-index: 10;
+    animation: playheadPulse 2s ease-in-out infinite;
+  }
+  .playhead::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+  }
+  @keyframes playheadPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* ---------- TOOLTIP ---------- */
+  .tooltip {
+    position: fixed;
+    z-index: 100;
+    background: #18181f;
+    border: 1px solid #2a2a33;
+    border-radius: 8px;
+    padding: 12px 14px;
+    min-width: 240px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .tooltip.show { opacity: 1; transform: translateY(0); }
+  .tooltip .tt-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .tooltip .tt-agent {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .tooltip .tt-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 14px;
+    font-size: 11px;
+  }
+  .tooltip .tt-grid .k { color: var(--text-faint); }
+  .tooltip .tt-grid .v { color: var(--text); font-family: "SF Mono", Menlo, monospace; }
+  .tooltip .tt-files {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #22222a;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .tooltip .tt-files .file { font-family: "SF Mono", Menlo, monospace; display: block; padding: 2px 0; }
+
+  /* ---------- INLINE DRILL-DOWN ---------- */
+  .drill-panel {
+    margin: 0 28px 24px 28px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+  }
+  .drill-panel.open {
+    max-height: 600px;
+    opacity: 1;
+    margin-bottom: 24px;
+  }
+
+  .drill-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 18px 22px 14px 22px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .drill-title-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .drill-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .drill-title .chip {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    color: rgba(0,0,0,0.75);
+    font-weight: 600;
+  }
+  .drill-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .drill-meta span .k { color: var(--text-faint); margin-right: 4px; }
+
+  .drill-close {
+    width: 28px; height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .drill-close:hover { color: var(--text); border-color: #2a2a33; }
+  .drill-close svg { width: 12px; height: 12px; }
+
+  .drill-body {
+    padding: 18px 22px 22px 22px;
+  }
+  .drill-section-title {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    margin-bottom: 10px;
+  }
+  .drill-vritti {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    margin-bottom: 22px;
+    max-width: 780px;
+  }
+  .drill-vritti em { color: var(--text-dim); font-style: normal; }
+
+  .toolcall-timeline {
+    position: relative;
+    height: 38px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .tc-block {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    border-radius: 3px;
+    opacity: 0.85;
+    cursor: pointer;
+    transition: opacity 0.12s;
+  }
+  .tc-block:hover { opacity: 1; }
+  .tc-block::after {
+    content: attr(data-tool);
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    color: rgba(0,0,0,0.7);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: calc(100% - 8px);
+    text-overflow: ellipsis;
+  }
+
+  .drill-files { display: flex; flex-direction: column; gap: 4px; }
+  .drill-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .drill-file svg { width: 12px; height: 12px; color: var(--text-faint); }
+  .drill-file .path { color: var(--text); }
+  .drill-file .diff { margin-left: auto; color: var(--text-faint); font-size: 10px; }
+  .drill-file .diff .plus { color: #7ec4b8; }
+  .drill-file .diff .minus { color: #c57b9c; }
+
+  /* ---------- BOTTOM INPUT ---------- */
+  .bottom {
+    flex-shrink: 0;
+    padding: 16px 28px 22px 28px;
+    border-top: 1px solid var(--border-soft);
+    background: var(--bg);
+  }
+  .input-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    transition: border-color 0.18s;
+  }
+  .input-bar:focus-within {
+    border-color: rgba(139, 92, 246, 0.45);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.08);
+  }
+  .input-sutra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--sutra);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .input-sutra .ring {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sutra);
+    box-shadow: 0 0 8px var(--sutra-glow);
+  }
+  .input-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .input-bar input::placeholder { color: var(--text-faint); }
+  .input-bar .send-hint {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: "SF Mono", Menlo, monospace;
+    padding: 3px 7px;
+    background: var(--bg-elev-2);
+    border-radius: 4px;
+  }
+
+  /* Attention popover */
+  .attention-popover {
+    position: absolute;
+    top: 62px;
+    right: 28px;
+    background: #18181f;
+    border: 1px solid #2a2a33;
+    border-radius: 10px;
+    padding: 14px;
+    min-width: 320px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+    z-index: 50;
+    display: none;
+  }
+  .attention-popover.show { display: block; }
+  .attention-popover h4 {
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .attention-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .attention-item:hover { background: rgba(255,255,255,0.03); }
+  .attention-item .swatch { width: 3px; height: 34px; border-radius: 2px; flex-shrink: 0; }
+  .attention-item .body { flex: 1; }
+  .attention-item .a-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .attention-item .a-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div>
+        <div class="brand-name">Sutra <span class="brand-sub">orchestrator</span></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="attention-pill" id="attentionPill">
+        <span class="dot"></span>
+        <span>2 items need attention</span>
+      </div>
+      <div class="view-switch">
+        <a href="mockup-m.html" class="active">Timeline</a>
+        <a href="mockup-g.html">River</a>
+        <a href="mockup-k.html">Orbital</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Attention popover -->
+  <div class="attention-popover" id="attentionPop">
+    <h4>Needs Attention</h4>
+    <div class="attention-item">
+      <div class="swatch swatch-geoint"></div>
+      <div class="body">
+        <div class="a-title">GEOINT — hotspot review paused</div>
+        <div class="a-sub">Awaiting permission to edit classification file</div>
+      </div>
+    </div>
+    <div class="attention-item">
+      <div class="swatch swatch-lovenotes"></div>
+      <div class="body">
+        <div class="a-title">LoveNotes — curriculum decision</div>
+        <div class="a-sub">v4.2 prompt set ready for review</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="time-range">
+      <span class="mono">08:00</span>
+      <span class="sep">—</span>
+      <span class="mono">11:30</span>
+      <span class="sep">·</span>
+      <span>3h 30m window</span>
+    </div>
+    <div class="tools">
+      <div class="zoom">
+        <label>Zoom</label>
+        <input type="range" min="50" max="200" value="100" />
+      </div>
+      <button class="btn" id="snapNow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Snap to now
+      </button>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="timeline-wrap">
+    <div class="timeline">
+
+      <!-- Ruler -->
+      <div class="ruler" id="ruler"></div>
+
+      <!-- Subtle grid overlay -->
+      <div class="grid-overlay" id="gridOverlay"></div>
+
+      <!-- SUTRA BUS ROW -->
+      <div class="sutra-row">
+        <div class="sutra-label">
+          <div class="sutra-badge">
+            <div class="ring"></div>
+            <div class="label">SUTRA</div>
+          </div>
+        </div>
+        <div class="sutra-bus">
+          <div class="bus-caption">dispatch bus</div>
+          <div class="dispatch-origin" style="left: 6%;"></div>
+          <div class="dispatch-origin" style="left: 14%;"></div>
+          <div class="dispatch-origin" style="left: 22%;"></div>
+          <div class="dispatch-origin" style="left: 32%;"></div>
+          <div class="dispatch-origin" style="left: 44%;"></div>
+          <div class="dispatch-origin" style="left: 58%;"></div>
+          <div class="dispatch-origin" style="left: 68%;"></div>
+          <div class="dispatch-origin" style="left: 78%;"></div>
+        </div>
+      </div>
+
+      <!-- Dispatch SVG lines (subtle, animated) -->
+      <svg class="dispatch-svg" id="dispatchSvg" preserveAspectRatio="none"></svg>
+
+      <!-- AGENT LANES -->
+      <div class="lanes" id="lanes"></div>
+
+      <!-- Playhead -->
+      <div class="playhead" id="playhead"></div>
+    </div>
+  </div>
+
+  <!-- DRILL PANEL -->
+  <div class="drill-panel" id="drillPanel">
+    <div class="drill-header">
+      <div class="drill-title-wrap">
+        <div class="drill-title">
+          <span class="chip" id="drillChip">AGENT</span>
+          <span id="drillName">Task Name</span>
+        </div>
+        <div class="drill-meta" id="drillMeta"></div>
+      </div>
+      <button class="drill-close" id="drillClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drill-body">
+      <div class="drill-section-title">Vritti — summary</div>
+      <p class="drill-vritti" id="drillVritti"></p>
+
+      <div class="drill-section-title">Tool calls</div>
+      <div class="toolcall-timeline" id="drillToolCalls"></div>
+
+      <div class="drill-section-title">Files touched</div>
+      <div class="drill-files" id="drillFiles"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM INPUT -->
+  <div class="bottom">
+    <div class="input-bar">
+      <div class="input-sutra">
+        <span class="ring"></span>
+        <span>Sutra</span>
+      </div>
+      <input type="text" placeholder="Talk to Sutra — dispatch a task, ask a question..." />
+      <span class="send-hint">⏎</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-title" id="ttTitle"></div>
+  <div class="tt-agent" id="ttAgent"></div>
+  <div class="tt-grid" id="ttGrid"></div>
+  <div class="tt-files" id="ttFiles"></div>
+</div>
+
+<script>
+/* ============================================================
+   TIMELINE DATA
+   Time axis: 08:00 → 11:30 = 210 minutes = 100%
+   now = 10:48 (168 min in) ≈ 80%
+   ============================================================ */
+
+const START_MIN = 0;      // 08:00
+const END_MIN = 210;      // 11:30
+const NOW_MIN = 168;      // 10:48
+
+const pct = (min) => (min / END_MIN) * 100;
+const widthPct = (start, end) => ((end - start) / END_MIN) * 100;
+
+const agents = [
+  {
+    id: 'lovenotes',
+    name: 'LoveNotes',
+    sub: 'product agent',
+    color: 'lovenotes',
+    tasks: [
+      {
+        name: 'Analyze trial conversions',
+        start: 8, end: 42, state: 'done',
+        model: 'Opus 4.6', tokens: '42.1k', cost: '$0.84',
+        files: ['context/plans/trial-analysis.md'],
+        vritti: 'Reviewed 11 trial couples across the Feb cohort. Pulled SMS engagement data, onboarding drop-off points, and correlation with v4.1 curriculum completion. Found that 0/11 converted despite high completion rates — the "emotional cotton candy" hypothesis holds: easy curriculum optimizes completion but destroys perceived value.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 6, color: '#7ec4b8' },
+          { name: 'Grep', start: 6, dur: 4, color: '#9bb5d9' },
+          { name: 'Read', start: 11, dur: 8, color: '#7ec4b8' },
+          { name: 'Bash', start: 20, dur: 5, color: '#c89b7b' },
+          { name: 'Write', start: 26, dur: 8, color: '#e8a87c' },
+        ],
+        fileDiffs: [
+          { path: 'context/plans/trial-analysis.md', plus: 142, minus: 0 },
+        ]
+      },
+      {
+        name: 'Draft v4.2 prompts',
+        start: 52, end: 108, state: 'done',
+        model: 'Opus 4.6', tokens: '78.3k', cost: '$1.54',
+        files: ['curriculum/v4.2/prompts.json', 'curriculum/v4.2/README.md'],
+        vritti: 'Drafted a v4.2 "hard mode" curriculum balancing appreciation prompts with action + stretch prompts. Each week now includes one observational prompt, one action prompt, and one reflection. Tested prompt wording against therapist feedback from the Feb 15 debate.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 8, color: '#7ec4b8' },
+          { name: 'Read', start: 9, dur: 6, color: '#7ec4b8' },
+          { name: 'Write', start: 16, dur: 18, color: '#e8a87c' },
+          { name: 'Write', start: 35, dur: 10, color: '#e8a87c' },
+          { name: 'Bash', start: 46, dur: 8, color: '#c89b7b' },
+        ],
+        fileDiffs: [
+          { path: 'curriculum/v4.2/prompts.json', plus: 287, minus: 0 },
+          { path: 'curriculum/v4.2/README.md', plus: 64, minus: 0 },
+        ]
+      },
+      {
+        name: 'SMS delivery check',
+        start: 155, end: 168, state: 'active',
+        model: 'Sonnet 4.6', tokens: '18.2k', cost: '$0.12',
+        files: [],
+        vritti: 'Running delivery health check on the 5 paid couples. Querying Twilio for bounce rates, checking Supabase for failed sends, verifying cron job execution in the last 24 hours.',
+        toolCalls: [
+          { name: 'Bash', start: 0, dur: 4, color: '#c89b7b' },
+          { name: 'Read', start: 5, dur: 3, color: '#7ec4b8' },
+          { name: 'Bash', start: 9, dur: 4, color: '#c89b7b' },
+        ],
+        fileDiffs: []
+      }
+    ]
+  },
+  {
+    id: 'content',
+    name: 'ContentWriter',
+    sub: 'writing agent',
+    color: 'content',
+    tasks: [
+      {
+        name: 'Reddit post series — Personal OS',
+        start: 20, end: 168, state: 'active',
+        model: 'Opus 4.6', tokens: '124.8k', cost: '$2.48',
+        files: ['content/reddit/personal-os-1.md', 'content/reddit/personal-os-2.md'],
+        vritti: 'Deep-dive Reddit post series on Personal OS architecture. Researching r/productivity and r/selfhosted for tone calibration, drafting three posts (intro, agent coordination, skills system). Currently on post 2, synthesizing examples from actual daily usage.',
+        toolCalls: [
+          { name: 'WebFetch', start: 0, dur: 14, color: '#9bb5d9' },
+          { name: 'Read', start: 16, dur: 9, color: '#7ec4b8' },
+          { name: 'Write', start: 27, dur: 32, color: '#e8a87c' },
+          { name: 'Read', start: 62, dur: 8, color: '#7ec4b8' },
+          { name: 'Write', start: 72, dur: 48, color: '#e8a87c' },
+          { name: 'WebFetch', start: 122, dur: 18, color: '#9bb5d9' },
+        ],
+        fileDiffs: [
+          { path: 'content/reddit/personal-os-1.md', plus: 312, minus: 18 },
+          { path: 'content/reddit/personal-os-2.md', plus: 178, minus: 4 },
+        ]
+      }
+    ]
+  },
+  {
+    id: 'geoint',
+    name: 'GEOINT',
+    sub: 'analysis agent',
+    color: 'geoint',
+    tasks: [
+      {
+        name: 'Hotspot briefing',
+        start: 4, end: 38, state: 'done',
+        model: 'Sonnet 4.6', tokens: '56.0k', cost: '$0.48',
+        files: ['geoint/briefings/2026-04-08.md'],
+        vritti: 'Compiled daily hotspot briefing covering 8 active regions. Cross-referenced satellite data, news feeds, and historical patterns. Briefing sent to orchestrator reports folder.',
+        toolCalls: [
+          { name: 'WebFetch', start: 0, dur: 12, color: '#9bb5d9' },
+          { name: 'Read', start: 14, dur: 6, color: '#7ec4b8' },
+          { name: 'Write', start: 22, dur: 12, color: '#e8a87c' },
+        ],
+        fileDiffs: [{ path: 'geoint/briefings/2026-04-08.md', plus: 218, minus: 0 }]
+      },
+      // PAUSED task (split)
+      {
+        name: 'Region classification review',
+        start: 70, end: 92, state: 'paused', splitFirst: true,
+        pausedReason: 'Awaiting permission to edit classification file',
+        model: 'Sonnet 4.6', tokens: '22.4k', cost: '$0.19',
+        files: [],
+        vritti: 'Began reviewing region classification updates. Paused at permission checkpoint — cannot edit the classification file without explicit user confirmation. Waiting for human approval before proceeding.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 10, color: '#7ec4b8' },
+          { name: 'Grep', start: 12, dur: 6, color: '#9bb5d9' },
+          { name: 'Read', start: 20, dur: 2, color: '#7ec4b8' },
+        ],
+        fileDiffs: []
+      },
+      // resumed half (dashed, not yet started — shows where it'll resume)
+    ]
+  },
+  {
+    id: 'coder',
+    name: 'Coder',
+    sub: 'engineering agent',
+    color: 'coder',
+    tasks: [
+      {
+        name: 'Refactor router module',
+        start: 2, end: 44, state: 'done',
+        model: 'Opus 4.6', tokens: '88.7k', cost: '$1.78',
+        files: ['bridge/router.py', 'bridge/rate_limiter.py'],
+        vritti: 'Refactored the agent-chat router into smaller composable modules. Extracted rate limiter, session writer, and message dispatcher into separate files. All tests passing, ready for review.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 6, color: '#7ec4b8' },
+          { name: 'Edit', start: 7, dur: 12, color: '#c57b9c' },
+          { name: 'Edit', start: 20, dur: 14, color: '#c57b9c' },
+          { name: 'Bash', start: 35, dur: 7, color: '#c89b7b' },
+        ],
+        fileDiffs: [
+          { path: 'bridge/router.py', plus: 84, minus: 142 },
+          { path: 'bridge/rate_limiter.py', plus: 96, minus: 0 },
+        ]
+      },
+      {
+        name: 'Fix session persistence bug',
+        start: 56, end: 92, state: 'done',
+        model: 'Opus 4.6', tokens: '64.2k', cost: '$1.28',
+        files: ['web/src/Auth.tsx', 'web/src/Onboarding.tsx'],
+        vritti: 'Traced session persistence bug across auth flow. Found race condition between supabase.auth.getSession() and the component mount. Fixed by adding explicit wait in Auth.tsx and wiring Onboarding.tsx to the session-ready event.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 8, color: '#7ec4b8' },
+          { name: 'Grep', start: 9, dur: 4, color: '#9bb5d9' },
+          { name: 'Edit', start: 14, dur: 10, color: '#c57b9c' },
+          { name: 'Edit', start: 25, dur: 8, color: '#c57b9c' },
+          { name: 'Bash', start: 34, dur: 2, color: '#c89b7b' },
+        ],
+        fileDiffs: [
+          { path: 'web/src/Auth.tsx', plus: 28, minus: 14 },
+          { path: 'web/src/Onboarding.tsx', plus: 16, minus: 8 },
+        ]
+      },
+      {
+        name: 'Wire bridge integration',
+        start: 142, end: 168, state: 'active',
+        model: 'Sonnet 4.6', tokens: '34.1k', cost: '$0.28',
+        files: ['bridge/bridge.py'],
+        vritti: 'Wiring the refactored router + rate limiter into bridge.py. Currently connecting the session-writer callbacks and testing end-to-end message flow through a staging thread.',
+        toolCalls: [
+          { name: 'Read', start: 0, dur: 5, color: '#7ec4b8' },
+          { name: 'Edit', start: 6, dur: 14, color: '#c57b9c' },
+          { name: 'Bash', start: 21, dur: 5, color: '#c89b7b' },
+        ],
+        fileDiffs: []
+      }
+    ]
+  },
+  {
+    id: 'brandywine',
+    name: 'Brandywine',
+    sub: 'research agent',
+    color: 'brandywine',
+    tasks: [
+      {
+        name: 'Market research — DAW UIs',
+        start: 78, end: 168, state: 'active',
+        model: 'Opus 4.6', tokens: '92.4k', cost: '$1.85',
+        files: ['research/daw-ui-patterns.md'],
+        vritti: 'Researching DAW UI patterns from Logic Pro, Ableton Live, Reaper, and Pro Tools. Looking at lane design, transport controls, clip visualization, and zoom behavior. Drafting a synthesis doc for the Sutra timeline view.',
+        toolCalls: [
+          { name: 'WebFetch', start: 0, dur: 18, color: '#9bb5d9' },
+          { name: 'WebFetch', start: 20, dur: 14, color: '#9bb5d9' },
+          { name: 'Read', start: 36, dur: 8, color: '#7ec4b8' },
+          { name: 'Write', start: 46, dur: 32, color: '#e8a87c' },
+          { name: 'WebFetch', start: 80, dur: 10, color: '#9bb5d9' },
+        ],
+        fileDiffs: [{ path: 'research/daw-ui-patterns.md', plus: 245, minus: 12 }]
+      }
+    ]
+  },
+  {
+    id: 'memory',
+    name: 'Memory',
+    sub: 'persistence agent',
+    color: 'memory',
+    tasks: [
+      { name: 'Snapshot', start: 14, end: 18, state: 'done', model: 'Haiku 4', tokens: '4.2k', cost: '$0.01', files: ['memory/snap-0814.json'], vritti: 'Periodic memory snapshot. Captured active todos, recent files, and key decisions from the last 30 minutes.', toolCalls: [{name:'Write', start:0, dur:4, color:'#e8a87c'}], fileDiffs: [{path:'memory/snap-0814.json', plus: 32, minus: 0}] },
+      { name: 'Snapshot', start: 74, end: 78, state: 'done', model: 'Haiku 4', tokens: '5.1k', cost: '$0.01', files: ['memory/snap-0914.json'], vritti: 'Periodic memory snapshot. Captured active todos and decisions.', toolCalls: [{name:'Write', start:0, dur:4, color:'#e8a87c'}], fileDiffs: [{path:'memory/snap-0914.json', plus: 38, minus: 0}] },
+      { name: 'Snapshot', start: 134, end: 138, state: 'done', model: 'Haiku 4', tokens: '4.8k', cost: '$0.01', files: ['memory/snap-1014.json'], vritti: 'Periodic memory snapshot.', toolCalls: [{name:'Write', start:0, dur:4, color:'#e8a87c'}], fileDiffs: [{path:'memory/snap-1014.json', plus: 34, minus: 0}] },
+    ]
+  }
+];
+
+/* ============================================================
+   RENDER RULER
+   ============================================================ */
+const ruler = document.getElementById('ruler');
+const times = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30'];
+times.forEach((t, i) => {
+  if (i === times.length - 1) return; // last tick is the end
+  const tick = document.createElement('div');
+  tick.className = 'tick';
+  tick.textContent = t;
+  ruler.appendChild(tick);
+});
+
+/* Grid overlay (7 gaps) */
+const gridOverlay = document.getElementById('gridOverlay');
+for (let i = 0; i < 7; i++) {
+  const g = document.createElement('div');
+  g.className = 'gline';
+  gridOverlay.appendChild(g);
+}
+
+/* ============================================================
+   RENDER LANES & BLOCKS
+   ============================================================ */
+const lanesEl = document.getElementById('lanes');
+
+function minToTime(m) {
+  const total = 8 * 60 + m;
+  const h = Math.floor(total / 60);
+  const mm = total % 60;
+  return `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+function fmtDur(m) {
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m/60)}h ${m%60}m`;
+}
+
+agents.forEach((agent) => {
+  const lane = document.createElement('div');
+  lane.className = 'lane';
+  lane.innerHTML = `
+    <div class="lane-label">
+      <div class="agent-swatch swatch-${agent.color}"></div>
+      <div class="lane-name-wrap">
+        <div class="lane-name">${agent.name}</div>
+        <div class="lane-sub">${agent.sub}</div>
+      </div>
+    </div>
+    <div class="lane-track">
+      <div class="lane-ctrls">
+        <button title="Pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7l3 3v3H9v-3l3-3V2"/><path d="M12 15v7"/></svg></button>
+        <button title="Mute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/></svg></button>
+        <button title="Solo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></button>
+      </div>
+    </div>
+  `;
+  const track = lane.querySelector('.lane-track');
+
+  agent.tasks.forEach((task) => {
+    const block = document.createElement('div');
+    block.className = `block bg-${agent.color} ${task.state}`;
+    block.style.left = pct(task.start) + '%';
+    block.style.width = widthPct(task.start, task.end) + '%';
+
+    const dur = task.end - task.start;
+    block.innerHTML = `
+      <div class="task-name">${task.name}</div>
+      <div class="duration">${fmtDur(dur)}</div>
+    `;
+
+    block._task = task;
+    block._agent = agent;
+    block.addEventListener('mouseenter', (e) => showTooltip(e, task, agent));
+    block.addEventListener('mousemove', moveTooltip);
+    block.addEventListener('mouseleave', hideTooltip);
+    block.addEventListener('click', () => openDrill(task, agent));
+
+    track.appendChild(block);
+
+    // If paused, draw a connector line + a faint "resume stub"
+    if (task.state === 'paused') {
+      const connector = document.createElement('div');
+      connector.className = 'pause-connector';
+      connector.style.left = pct(task.end) + '%';
+      connector.style.width = (pct(NOW_MIN) - pct(task.end)) + '%';
+      track.appendChild(connector);
+    }
+  });
+
+  lanesEl.appendChild(lane);
+});
+
+/* ============================================================
+   PLAYHEAD
+   ============================================================ */
+const playhead = document.getElementById('playhead');
+function positionPlayhead() {
+  const labelW = 140;
+  playhead.style.left = `calc(${labelW}px + ${pct(NOW_MIN)}%)`;
+  // Shrink to only cover lanes area, not labels
+  playhead.style.left = `calc(${labelW}px + ${(NOW_MIN/END_MIN)*100}% * (100% - ${labelW}px) / 100%)`;
+}
+// Simpler: absolutely position within timeline; since timeline has label gutter, offset
+function setPlayhead() {
+  const timelineEl = document.querySelector('.timeline');
+  const lanesRect = document.querySelector('.lane-track').getBoundingClientRect();
+  const tlRect = timelineEl.getBoundingClientRect();
+  const leftInTl = lanesRect.left - tlRect.left;
+  const width = lanesRect.width;
+  playhead.style.left = (leftInTl + (NOW_MIN/END_MIN) * width) + 'px';
+}
+setTimeout(setPlayhead, 50);
+window.addEventListener('resize', setPlayhead);
+
+/* ============================================================
+   DISPATCH LINES (SVG) — subtle, animated
+   ============================================================ */
+function drawDispatchLines() {
+  const svg = document.getElementById('dispatchSvg');
+  const timelineEl = document.querySelector('.timeline');
+  const tlRect = timelineEl.getBoundingClientRect();
+  const laneTracks = document.querySelectorAll('.lane-track');
+  if (!laneTracks.length) return;
+  const firstTrack = laneTracks[0].getBoundingClientRect();
+  const offsetLeft = firstTrack.left - tlRect.left;
+  const width = firstTrack.width;
+
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', 800);
+  svg.style.left = offsetLeft + 'px';
+  svg.style.top = (document.querySelector('.sutra-row').getBoundingClientRect().bottom - tlRect.top) + 'px';
+  svg.innerHTML = '';
+
+  // Pick 4 active dispatch points (matches origin dots above)
+  const dispatches = [
+    { x: 0.06, laneIdx: 0, cls: '' },
+    { x: 0.14, laneIdx: 2, cls: 'd2' },
+    { x: 0.32, laneIdx: 1, cls: 'd3' },
+    { x: 0.58, laneIdx: 4, cls: 'd4' },
+  ];
+
+  const laneRows = document.querySelectorAll('.lane');
+  dispatches.forEach(d => {
+    const targetLane = laneRows[d.laneIdx];
+    if (!targetLane) return;
+    const laneRect = targetLane.getBoundingClientRect();
+    const yTarget = (laneRect.top + laneRect.height/2) - (tlRect.top + document.querySelector('.sutra-row').getBoundingClientRect().bottom - tlRect.top);
+    const xPos = d.x * width;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${xPos} 0 Q ${xPos} ${yTarget/2}, ${xPos} ${yTarget}`);
+    path.setAttribute('class', 'dispatch-line ' + d.cls);
+    svg.appendChild(path);
+  });
+}
+setTimeout(drawDispatchLines, 100);
+window.addEventListener('resize', drawDispatchLines);
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, task, agent) {
+  document.getElementById('ttTitle').textContent = task.name;
+  document.getElementById('ttAgent').textContent = agent.name + ' · ' + (task.state === 'paused' ? 'Paused' : task.state === 'active' ? 'Running' : 'Completed');
+  const dur = task.end - task.start;
+  const gridHtml = `
+    <div class="k">Duration</div><div class="v">${fmtDur(dur)}</div>
+    <div class="k">Started</div><div class="v">${minToTime(task.start)}</div>
+    <div class="k">Model</div><div class="v">${task.model}</div>
+    <div class="k">Tokens</div><div class="v">${task.tokens}</div>
+    <div class="k">Cost</div><div class="v">${task.cost}</div>
+  `;
+  document.getElementById('ttGrid').innerHTML = gridHtml;
+  const filesEl = document.getElementById('ttFiles');
+  if (task.files && task.files.length) {
+    filesEl.innerHTML = task.files.map(f => `<span class="file">${f}</span>`).join('');
+    filesEl.style.display = 'block';
+  } else {
+    filesEl.style.display = 'none';
+  }
+  tooltip.classList.add('show');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const pad = 16;
+  let x = e.clientX + pad;
+  let y = e.clientY + pad;
+  const rect = tooltip.getBoundingClientRect();
+  if (x + rect.width > window.innerWidth - 20) x = e.clientX - rect.width - pad;
+  if (y + rect.height > window.innerHeight - 20) y = e.clientY - rect.height - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTooltip() {
+  tooltip.classList.remove('show');
+}
+
+/* ============================================================
+   DRILL PANEL
+   ============================================================ */
+const drillPanel = document.getElementById('drillPanel');
+const drillClose = document.getElementById('drillClose');
+drillClose.addEventListener('click', () => drillPanel.classList.remove('open'));
+
+function openDrill(task, agent) {
+  document.getElementById('drillName').textContent = task.name;
+  const chip = document.getElementById('drillChip');
+  chip.textContent = agent.name;
+  chip.style.background = `var(--c-${agent.color})`;
+
+  const dur = task.end - task.start;
+  const metaHtml = `
+    <span><span class="k">duration</span>${fmtDur(dur)}</span>
+    <span><span class="k">model</span>${task.model}</span>
+    <span><span class="k">tokens</span>${task.tokens}</span>
+    <span><span class="k">cost</span>${task.cost}</span>
+    <span><span class="k">state</span>${task.state}</span>
+  `;
+  document.getElementById('drillMeta').innerHTML = metaHtml;
+  document.getElementById('drillVritti').textContent = task.vritti;
+
+  // Tool calls mini-timeline
+  const tcWrap = document.getElementById('drillToolCalls');
+  tcWrap.innerHTML = '';
+  if (task.toolCalls && task.toolCalls.length) {
+    const maxEnd = Math.max(...task.toolCalls.map(tc => tc.start + tc.dur));
+    task.toolCalls.forEach(tc => {
+      const b = document.createElement('div');
+      b.className = 'tc-block';
+      b.style.left = ((tc.start / maxEnd) * 100) + '%';
+      b.style.width = ((tc.dur / maxEnd) * 100) + '%';
+      b.style.background = tc.color;
+      b.setAttribute('data-tool', tc.name);
+      tcWrap.appendChild(b);
+    });
+  }
+
+  // Files
+  const filesWrap = document.getElementById('drillFiles');
+  filesWrap.innerHTML = '';
+  if (task.fileDiffs && task.fileDiffs.length) {
+    task.fileDiffs.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'drill-file';
+      row.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="path">${f.path}</span>
+        <span class="diff"><span class="plus">+${f.plus}</span> <span class="minus">-${f.minus}</span></span>
+      `;
+      filesWrap.appendChild(row);
+    });
+  } else {
+    filesWrap.innerHTML = '<div style="font-size:11px;color:var(--text-faint);font-style:italic;">No files touched yet</div>';
+  }
+
+  drillPanel.classList.add('open');
+  setTimeout(() => drillPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200);
+}
+
+/* ============================================================
+   ATTENTION POPOVER
+   ============================================================ */
+const attPill = document.getElementById('attentionPill');
+const attPop = document.getElementById('attentionPop');
+attPill.addEventListener('click', (e) => {
+  e.stopPropagation();
+  attPop.classList.toggle('show');
+});
+document.addEventListener('click', (e) => {
+  if (!attPop.contains(e.target) && !attPill.contains(e.target)) {
+    attPop.classList.remove('show');
+  }
+});
+
+/* ============================================================
+   SNAP TO NOW
+   ============================================================ */
+document.getElementById('snapNow').addEventListener('click', () => {
+  const wrap = document.querySelector('.timeline-wrap');
+  const track = document.querySelector('.lane-track');
+  const rect = track.getBoundingClientRect();
+  const scrollTarget = (NOW_MIN/END_MIN) * rect.width - window.innerWidth/2;
+  wrap.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
+});
+
+</script>
+</body>
+</html>

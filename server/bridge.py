@@ -4,17 +4,9 @@ Bridge Server for Agent Chat.
 HTTP server handling agent management, chat messages, and reports.
 """
 
-import sys
-if sys.version_info < (3, 10):
-    sys.stderr.write(
-        f"Sutra requires Python 3.10 or newer (you have {sys.version.split()[0]}).\n"
-        f"Stock macOS python3 is 3.9. Install a newer interpreter (brew install "
-        f"python@3.12) and re-run, or set SUTRA_PYTHON in .env.\n"
-    )
-    sys.exit(1)
-
 import json
 import os
+import sys
 import time
 import threading
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -230,6 +222,119 @@ def drain_instruction_queue(agent_id: str):
         db.set_agent_status(agent_id, 'online')
         # Try next item in queue even if this one failed
         drain_instruction_queue(agent_id)
+
+
+PERSONAL_OS_ROOT = Path("/Users/christopherk.marks/Downloads/personal-os-main")
+
+MODEL_MAX_TOKENS = {
+    'opus': 1000000, 'claude-opus-4-6': 1000000, 'claude-opus-4-7': 1000000,
+    'sonnet': 200000, 'claude-sonnet-4-6': 200000,
+    'haiku': 200000, 'claude-haiku-4-5': 200000,
+}
+
+
+def _classify_agent(agent: dict) -> str:
+    """Return one of: sutra | project | utility | worker."""
+    name = agent.get('name', '')
+    cwd = agent.get('cwd', '') or ''
+    role = agent.get('role', 'worker')
+    if name == 'Sutra':
+        return 'sutra'
+    if '/Projects/' in cwd:
+        return 'project'
+    if role == 'utility':
+        return 'utility'
+    return 'worker'
+
+
+def _render_recent_reports(limit: int = 10) -> str:
+    """Render the last N reports across all agents as markdown."""
+    try:
+        rows = db.get_reports(limit=limit)
+    except Exception:
+        return ""
+    if not rows:
+        return ""
+    lines = ["# Recent worker reports", ""]
+    for r in rows:
+        ts = r.get('created_at', '')
+        rtype = r.get('type', '?')
+        agent_name = r.get('agent_name', '?')
+        title = r.get('title', '')
+        summary = r.get('summary', '')
+        lines.append(f"## [{rtype}] {agent_name} — {title}")
+        lines.append(f"_{ts}_")
+        lines.append("")
+        lines.append(summary)
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _build_doc_defs(agent: dict) -> list:
+    """Build the agent-aware list of injectable docs.
+
+    Each entry: {key, name, path, default, synthetic?}.
+    The caller resolves existence/tokens/content separately.
+    """
+    agent_name = agent.get('name', 'Unknown')
+    agent_cwd = agent.get('cwd', '') or ''
+    agent_type = _classify_agent(agent)
+    state_md = PERSONAL_OS_ROOT / "data" / "agents" / agent_name / "state.md"
+
+    if agent_type == 'sutra':
+        return [
+            {"key": "sutra_identity", "name": "SUTRA-IDENTITY.md", "path": str(PERSONAL_OS_ROOT / "SUTRA-IDENTITY.md"), "default": True},
+            {"key": "context_payload", "name": "CONTEXT-PAYLOAD.md", "path": str(PERSONAL_OS_ROOT / "CONTEXT-PAYLOAD.md"), "default": True},
+            {"key": "telos", "name": "TELOS.md", "path": str(PERSONAL_OS_ROOT / "TELOS.md"), "default": True},
+            {"key": "state", "name": "state.md", "path": str(state_md), "default": True},
+            {"key": "recent_reports", "name": "Recent worker reports", "path": "<synthetic:recent_reports>", "default": True, "synthetic": True},
+            {"key": "active_work", "name": ".context/active-work.md", "path": str(PERSONAL_OS_ROOT / ".context" / "active-work.md"), "default": False},
+            {"key": "context", "name": "CONTEXT.md", "path": str(PERSONAL_OS_ROOT / "CONTEXT.md"), "default": False},
+            {"key": "learned", "name": "LEARNED.md", "path": str(PERSONAL_OS_ROOT / "LEARNED.md"), "default": False},
+            {"key": "tasks", "name": "TASKS.md", "path": str(PERSONAL_OS_ROOT / "TASKS.md"), "default": False},
+        ]
+
+    if agent_type == 'project' and agent_cwd:
+        cwd_path = Path(agent_cwd)
+        return [
+            {"key": "project_claude", "name": "Project CLAUDE.md", "path": str(cwd_path / "CLAUDE.md"), "default": True},
+            {"key": "project_infra", "name": "Project INFRA.md", "path": str(cwd_path / "INFRA.md"), "default": True},
+            {"key": "state", "name": "state.md", "path": str(state_md), "default": True},
+            {"key": "project_last_session", "name": "Project last-session.md", "path": str(cwd_path / "context" / "last-session.md"), "default": False},
+            {"key": "project_active_work", "name": "Project active-work.md", "path": str(cwd_path / ".context" / "active-work.md"), "default": False},
+            {"key": "context_payload", "name": "CONTEXT-PAYLOAD.md", "path": str(PERSONAL_OS_ROOT / "CONTEXT-PAYLOAD.md"), "default": False},
+            {"key": "telos", "name": "TELOS.md", "path": str(PERSONAL_OS_ROOT / "TELOS.md"), "default": False},
+            {"key": "learned", "name": "LEARNED.md", "path": str(PERSONAL_OS_ROOT / "LEARNED.md"), "default": False},
+        ]
+
+    return [
+        {"key": "state", "name": "state.md", "path": str(state_md), "default": True},
+        {"key": "context_payload", "name": "CONTEXT-PAYLOAD.md", "path": str(PERSONAL_OS_ROOT / "CONTEXT-PAYLOAD.md"), "default": False},
+        {"key": "telos", "name": "TELOS.md", "path": str(PERSONAL_OS_ROOT / "TELOS.md"), "default": False},
+        {"key": "tasks", "name": "TASKS.md", "path": str(PERSONAL_OS_ROOT / "TASKS.md"), "default": False},
+        {"key": "learned", "name": "LEARNED.md", "path": str(PERSONAL_OS_ROOT / "LEARNED.md"), "default": False},
+    ]
+
+
+def _resolve_doc_content(doc_def: dict) -> tuple:
+    """Return (exists, content, tokens, last_modified_iso) for a doc def."""
+    if doc_def.get('synthetic'):
+        if doc_def['key'] == 'recent_reports':
+            content = _render_recent_reports(limit=10)
+            return (bool(content), content, len(content) // 4, None)
+        return (False, "", 0, None)
+    p_str = doc_def.get('path', '')
+    if not p_str:
+        return (False, "", 0, None)
+    p = Path(p_str)
+    if not p.exists():
+        return (False, "", 0, None)
+    try:
+        content = p.read_text()
+    except Exception:
+        return (False, "", 0, None)
+    from datetime import datetime
+    return (True, content, len(content) // 4, datetime.fromtimestamp(p.stat().st_mtime).isoformat())
 
 
 class AgentChatHandler(BaseHTTPRequestHandler):
@@ -553,6 +658,30 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                     "current": str(p),
                     "items": items
                 })
+            except PermissionError:
+                self.send_error_json("Permission denied", 403)
+            except Exception as e:
+                self.send_error_json(str(e), 500)
+
+        elif path == '/api/file':
+            # Read a file and return its content (read-only, text files only)
+            file_path = query.get('path', [''])[0]
+            if not file_path:
+                self.send_error_json("Missing path parameter", 400)
+                return
+            try:
+                p = Path(file_path).expanduser().resolve()
+                if not p.exists():
+                    self.send_error_json("File not found", 404)
+                    return
+                if p.is_dir():
+                    self.send_error_json("Path is a directory", 400)
+                    return
+                if p.stat().st_size > 500_000:
+                    self.send_error_json("File too large (max 500KB)", 413)
+                    return
+                content = p.read_text(encoding='utf-8', errors='replace')
+                self.send_json({"path": str(p), "name": p.name, "content": content})
             except PermissionError:
                 self.send_error_json("Permission denied", 403)
             except Exception as e:
@@ -1428,7 +1557,8 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 return
 
             agent_name = agent.get('name', 'Unknown')
-            PROJECT_ROOT = Path(os.environ.get("SUTRA_PROJECT_ROOT", str(Path.home() / "sutra-project")))
+            agent_type = _classify_agent(agent)
+            model_max = MODEL_MAX_TOKENS.get(agent.get('model', 'sonnet'), 200000)
 
             # Get turn count
             thread = db.get_thread_by_agent(agent_id)
@@ -1440,39 +1570,30 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                         (thread['id'],)
                     ).fetchone()[0]
 
-            # Define available docs
-            doc_defs = [
-                {"key": "telos", "name": "TELOS.md", "path": str(PROJECT_ROOT / "TELOS.md"), "default": True},
-                {"key": "context_payload", "name": "CONTEXT-PAYLOAD.md", "path": str(PROJECT_ROOT / "CONTEXT-PAYLOAD.md"), "default": True},
-                {"key": "state", "name": "state.md", "path": str(PROJECT_ROOT / "data" / "agents" / agent_name / "state.md"), "default": True},
-                {"key": "context", "name": "CONTEXT.md", "path": str(PROJECT_ROOT / "CONTEXT.md"), "default": False},
-                {"key": "learned", "name": "LEARNED.md", "path": str(PROJECT_ROOT / "LEARNED.md"), "default": False},
-                {"key": "tasks", "name": "TASKS.md", "path": str(PROJECT_ROOT / "TASKS.md"), "default": False},
-            ]
+            doc_defs = _build_doc_defs(agent)
 
             available_docs = []
             for d in doc_defs:
-                p = Path(d['path'])
-                tokens = 0
-                last_modified = None
-                if p.exists():
-                    content = p.read_text()
-                    tokens = len(content) // 4  # approximate token count
-                    from datetime import datetime
-                    last_modified = datetime.fromtimestamp(p.stat().st_mtime).isoformat()
+                exists, _content, tokens, last_modified = _resolve_doc_content(d)
+                # If the source is missing, force default OFF so the modal doesn't
+                # show a default-on-but-disabled checkbox.
+                default = bool(d.get('default')) and exists
                 available_docs.append({
                     "key": d['key'],
                     "name": d['name'],
                     "path": d['path'],
                     "tokens": tokens,
                     "last_modified": last_modified,
-                    "default": d['default'],
-                    "exists": p.exists(),
+                    "default": default,
+                    "exists": exists,
+                    "synthetic": bool(d.get('synthetic')),
                 })
 
             self.send_json({
                 "agent_id": agent_id,
                 "agent_name": agent_name,
+                "agent_type": agent_type,
+                "model_max_tokens": model_max,
                 "turn_count": turn_count,
                 "threshold": 80,
                 "available_docs": available_docs,
@@ -1549,15 +1670,14 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 self.send_error_json(f"Missing required fields: {required}")
                 return
 
-            # HARD BOUNDARY: all agent cwds must live under SUTRA_PROJECT_ROOT.
-            PROJECT_ROOT = os.environ.get("SUTRA_PROJECT_ROOT", str(Path.home() / "sutra-project"))
+            # HARD BOUNDARY: all agent cwds must live under personal-os-main
+            PERSONAL_OS_ROOT = "/Users/christopherk.marks/Downloads/personal-os-main"
             requested_cwd = str(data['cwd']).rstrip('/')
-            if not requested_cwd.startswith(PROJECT_ROOT):
+            if not requested_cwd.startswith(PERSONAL_OS_ROOT):
                 self.send_error_json(
-                    f"cwd must be inside SUTRA_PROJECT_ROOT ({PROJECT_ROOT}). "
+                    f"cwd must be inside {PERSONAL_OS_ROOT}. "
                     f"Got: {requested_cwd}. "
-                    f"Either move the directory under that root, or set SUTRA_PROJECT_ROOT in .env "
-                    f"to a path that contains it.",
+                    f"For external projects, create a workspace under Projects/prototypes/ instead.",
                     status=400
                 )
                 return
@@ -1577,23 +1697,6 @@ class AgentChatHandler(BaseHTTPRequestHandler):
             else:
                 model = 'sonnet'
 
-            # Auto-apply the orchestrator system prompt for the canonical
-            # Sutra agent (or anything created with role="orchestrator")
-            # unless the caller passed an explicit system_prompt.
-            system_prompt = data.get('system_prompt')
-            role = data.get('role', 'worker')
-            is_orchestrator = (data['name'] == 'Sutra') or (role == 'orchestrator')
-            if is_orchestrator and not system_prompt:
-                template_path = Path(__file__).parent.parent / "templates" / "sutra-orchestrator.md"
-                if template_path.exists():
-                    try:
-                        full = template_path.read_text()
-                        # Skip the header block (everything before the first '---' divider)
-                        parts = full.split('\n---\n', 1)
-                        system_prompt = parts[1].strip() if len(parts) == 2 else full
-                    except Exception as e:
-                        logger.warning(f"Could not load orchestrator template: {e}")
-
             agent = db.create_agent(
                 name=data['name'],
                 cwd=validated_cwd,
@@ -1601,8 +1704,8 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 emoji=data.get('emoji', '🤖'),
                 model=model,
                 provider=provider,
-                system_prompt=system_prompt,
-                role=role,
+                system_prompt=data.get('system_prompt'),
+                role=data.get('role', 'worker')
             )
 
             # Initialize git-backed workspace (REQ-2.1)
@@ -1615,50 +1718,30 @@ class AgentChatHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Workspace init failed for {data['name']}: {e}")
 
-            # Session recovery is OPT-IN. By default, a new agent starts fresh
-            # — even if there's an existing Claude JSONL on disk for this cwd
-            # (e.g. the user runs `claude` directly there in another terminal),
-            # we don't auto-attach to it. Set `recover_session: true` in the
-            # request body to opt in.
-            recovered_meta = None
-            if data.get('recover_session'):
-                try:
-                    recovered = session_manager.recover_agent_session(data['name'], data['cwd'])
-                    if recovered and agent.get('thread_id'):
-                        session_id = recovered.get('session_id')
-                        session_file = recovered.get('file_path') or recovered.get('session_file')
-                        if session_file and Path(session_file).exists():
-                            db.update_thread_session(agent['thread_id'], session_id)
-                            session_manager.register_session(
-                                session_id=session_id,
-                                agent_id=agent['id'],
-                                agent_name=agent['name'],
-                                cwd=data['cwd'],
-                                model=data.get('model', 'sonnet'),
-                                session_file=session_file
-                            )
-                            agent['session_id'] = session_id
-                            agent['_recovered_session'] = True
-                            recovered_meta = {'session_id': session_id, 'session_file': session_file}
-                            logger.info(f"Recovered session {session_id[:8]}... for recreated agent {data['name']}")
-                        else:
-                            logger.warning(f"Session recovery for {data['name']}: file not found, starting fresh")
-                except Exception as e:
-                    logger.warning(f"Session recovery failed for {data['name']}: {e}")
-            else:
-                # Surface a heads-up if there IS a recoverable session, so the
-                # user can re-create with recover_session=true if they wanted it.
-                try:
-                    candidate = session_manager.recover_agent_session(data['name'], data['cwd'])
-                    if candidate and candidate.get('session_id'):
-                        agent['_recoverable_session_available'] = candidate['session_id']
-                        logger.info(
-                            f"Existing session detected for {data['name']} at {data['cwd']} "
-                            f"({candidate['session_id'][:8]}...) — not attached "
-                            f"(pass recover_session=true to opt in)"
+            # Try to recover a previous session for this agent
+            try:
+                recovered = session_manager.recover_agent_session(data['name'], data['cwd'])
+                if recovered and agent.get('thread_id'):
+                    session_id = recovered.get('session_id')
+                    # Verify the session file actually exists before linking
+                    session_file = recovered.get('file_path') or recovered.get('session_file')
+                    if session_file and Path(session_file).exists():
+                        db.update_thread_session(agent['thread_id'], session_id)
+                        session_manager.register_session(
+                            session_id=session_id,
+                            agent_id=agent['id'],
+                            agent_name=agent['name'],
+                            cwd=data['cwd'],
+                            model=data.get('model', 'sonnet'),
+                            session_file=session_file
                         )
-                except Exception:
-                    pass
+                        agent['session_id'] = session_id
+                        agent['_recovered_session'] = True
+                        logger.info(f"Recovered session {session_id[:8]}... for recreated agent {data['name']}")
+                    else:
+                        logger.warning(f"Session recovery for {data['name']}: file not found, starting fresh")
+            except Exception as e:
+                logger.warning(f"Session recovery failed for {data['name']}: {e}")
 
             # Broadcast agent_created so any connected UI can add the lane immediately
             signal_agent_created(agent['id'], agent['name'])
@@ -1978,7 +2061,7 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 self.send_error_json("Missing 'path' field")
                 return
             # Security: only allow files under personal-os-main
-            ALLOWED_ROOT = os.environ.get("SUTRA_PROJECT_ROOT", str(Path.home() / "sutra-project"))
+            ALLOWED_ROOT = "/Users/christopherk.marks/Downloads/personal-os-main"
             if not os.path.abspath(file_path).startswith(ALLOWED_ROOT):
                 self.send_error_json("Path must be inside personal-os-main", 403)
                 return
@@ -2057,31 +2140,26 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 self.send_error_json(f"No thread for agent '{agent_name}'", 404)
                 return
 
-            PROJECT_ROOT = Path(os.environ.get("SUTRA_PROJECT_ROOT", str(Path.home() / "sutra-project")))
+            # Build the agent-aware doc list and resolve only the requested keys.
+            doc_defs = _build_doc_defs(agent)
+            defs_by_key = {d['key']: d for d in doc_defs}
 
-            # Build doc paths map
-            doc_paths = {
-                "telos": PROJECT_ROOT / "TELOS.md",
-                "context_payload": PROJECT_ROOT / "CONTEXT-PAYLOAD.md",
-                "state": PROJECT_ROOT / "data" / "agents" / agent_name / "state.md",
-                "context": PROJECT_ROOT / "CONTEXT.md",
-                "learned": PROJECT_ROOT / "LEARNED.md",
-                "tasks": PROJECT_ROOT / "TASKS.md",
-            }
-
-            # Read selected docs and store as reset-context.json
             reset_context = {}
             for doc_key in inject_docs:
-                doc_path = doc_paths.get(doc_key)
-                if doc_path and doc_path.exists():
-                    reset_context[doc_key] = {
-                        "name": doc_path.name,
-                        "path": str(doc_path),
-                        "content": doc_path.read_text(),
-                    }
+                d = defs_by_key.get(doc_key)
+                if not d:
+                    continue
+                exists, content, _tokens, _lm = _resolve_doc_content(d)
+                if not exists:
+                    continue
+                reset_context[doc_key] = {
+                    "name": d['name'],
+                    "path": d['path'],
+                    "content": content,
+                }
 
             # Save reset context for the agent
-            agent_data_dir = PROJECT_ROOT / "data" / "agents" / agent_name
+            agent_data_dir = PERSONAL_OS_ROOT / "data" / "agents" / agent_name
             agent_data_dir.mkdir(parents=True, exist_ok=True)
             reset_context_file = agent_data_dir / "reset-context.json"
             reset_payload = {
@@ -2156,13 +2234,8 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                                 extra={'old_session_id': old_session_id},
                             )
 
-                            # Use the SAME interpreter that's running Sutra so
-                            # the child gets a Python ≥ 3.10 (Continuum's
-                            # spoof_tool uses PEP 604 union types). Stock
-                            # macOS `python3` is 3.9 → would fail to import.
-                            spoof_python = os.environ.get('SUTRA_PYTHON') or sys.executable
                             proc = sp_reset.Popen(
-                                [spoof_python, f'{continuum_dir}/spoof_tool.py',
+                                ['python3', f'{continuum_dir}/spoof_tool.py',
                                  '--compress',
                                  '--session', old_session_id,
                                  '--prompt', spoof_prompt],
@@ -2363,7 +2436,7 @@ class AgentChatHandler(BaseHTTPRequestHandler):
             tier = agent.get('permission_tier', 'autonomous')
             if tier == 'restricted':
                 self.send_error_json(
-                    f"Agent '{agent_name}' is restricted — owner-only",
+                    f"Agent '{agent_name}' is restricted — Christopher-only",
                     403
                 )
                 return
@@ -2881,8 +2954,8 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 "- Do NOT add XML tags, markdown fencing, quotes, or prefaces in your output\n\n"
                 f"The rewritten prompt will be dispatched to {target}.\n\n"
                 "EXAMPLES:\n"
-                "Input: <prompt_to_rewrite>whats going on with the marketing project</prompt_to_rewrite>\n"
-                "Output: Summarize Marketing project status: active campaigns, recent metrics, open blockers.\n\n"
+                "Input: <prompt_to_rewrite>whats going on with lovenotes</prompt_to_rewrite>\n"
+                "Output: Summarize LoveNotes status: active couples, recent conversions, open blockers.\n\n"
                 "Input: <prompt_to_rewrite>help me think about this</prompt_to_rewrite>\n"
                 "Output: Help me think through [the current topic in context]. Flag missing info if the topic is unclear.\n\n"
                 "Input: <prompt_to_rewrite>why did it break</prompt_to_rewrite>\n"

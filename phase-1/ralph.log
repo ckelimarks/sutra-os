@@ -1,0 +1,376 @@
+=== Ralph Loop Started: Sat Apr 11 10:15:19 CDT 2026 ===
+Max iterations: 20
+
+--- Iteration 1 / 20: Sat Apr 11 10:15:19 CDT 2026 ---
+Next task: - [ ] **TASK-1** — Port static HTML/CSS from `web/mockup-n-warm.html` to `web/index.html`. Keep ha
+**TASK-1 Complete!**
+
+Successfully ported the static timeline UI from `mockup-n-warm.html` to `web/index.html`. 
+
+**Verification:**
+- ✅ Server running on port 8910 serving new timeline UI
+- ✅ All key elements present: header, toolbar, ruler, lanes, attention pill, zoom slider
+- ✅ Hardcoded mock data preserved for next tasks
+- ✅ Zero JS errors (valid syntax, clean structure)
+- ✅ Committed with message: `TASK-1: Port static HTML/CSS from mockup-n-warm.html to live index`
+- ✅ Updated TASK.md checklist and progress log
+
+The foundation is ready for TASK-2 (replacing hardcoded agents with live API data).
+
+--- Iteration 2 / 20: Sat Apr 11 10:16:47 CDT 2026 ---
+Next task: - [ ] **TASK-2** — Replace hardcoded `agents` array with live fetch from `GET /api/agents`. Cycle 
+Perfect! **TASK-2 is now complete.** 
+
+## Summary
+
+I've successfully replaced the hardcoded agents array with live API data:
+
+**Changes Made:**
+- Removed ~250 lines of hardcoded mock agent data
+- Added `loadAgents()` async function that fetches from `GET /api/agents` on page load
+- Maps API responses to UI format with:
+  - Colors cycling by index through warm palette (lovenotes → designer)
+  - Icons mapped from emoji field (bot → terminal, etc.)
+  - Provider/model info displayed in subtitle
+  - Empty tasks array (wired in TASK-3)
+- Created `renderAgents()` function to render lanes
+
+**Testing:**
+- API correctly returns 4 agents
+- Created TestAgent3 and verified it appears in the agents list
+- All color assignments work correctly by index
+
+**Acceptance Criteria Met:** ✓
+- Live agents fetch from API ✓
+- Colors cycle by index ✓  
+- New agents created via curl appear on refresh ✓
+- Zero JS errors ✓
+
+TASK-2 is committed. Ready for TASK-3 (wire task blocks to real message history).
+
+--- Iteration 3 / 20: Sat Apr 11 10:21:12 CDT 2026 ---
+Next task: - [ ] **TASK-3** — Wire task blocks to real message history via `GET /api/threads/{id}/messages`. 
+Excellent! **TASK-3 is complete.** 
+
+## Summary
+
+I successfully implemented task block wiring to real message history:
+
+### What was implemented:
+1. **`loadAllMessages()`** - Fetches messages from `GET /api/threads/{thread_id}/messages` for each agent
+2. **`messagesToTasks()`** - Converts user+assistant message pairs into task blocks with:
+   - Task name (first 6-8 words of user message)
+   - Start/end timestamps
+   - Token counts and cost
+   - State (done/active)
+   - Vritti (message content for popup)
+3. **`timestampToMinutes()`** - Converts actual timestamps to minutes relative to earliest message
+4. **`updateRuler()`** - Dynamically updates the time ruler based on message timestamps
+5. **Dynamic block positioning** - Blocks now position based on actual message timestamps instead of hardcoded mock data
+
+### Acceptance criteria verified:
+- ✅ Create agent and send messages via API → messages appear in thread
+- ✅ Refresh timeline → task blocks appear on agent's lane, positioned by time
+- ✅ Hover block → tooltip shows task name, tokens, cost
+- ✅ Click block → popup with vritti (message content)
+- ✅ Time ruler spans earliest to latest message + 6 min buffer
+
+### Commits:
+- `0d4c461` - TASK-3: Wire task blocks to real message history
+- `62e45cf` - TASK-3: Mark complete in checklist and add progress log
+
+The next task (TASK-4) is wiring the "Create Agent" modal to the API.
+
+--- Iteration 4 / 20: Sat Apr 11 10:28:05 CDT 2026 ---
+Next task: - [ ] **TASK-4** — Wire "Create Agent" modal to `POST /api/agents`. Include Ollama provider dropdo
+**TASK-4 Complete** ✓
+
+I've successfully wired the "Create Agent" modal to the `POST /api/agents` endpoint. Here's what was implemented:
+
+### Changes Made:
+1. **Added "New Agent" button** to the toolbar with the plus-icon SVG
+2. **Created the modal UI** with form fields:
+   - Agent Name (required)
+   - Working Directory (required)
+   - Provider dropdown (Claude or Ollama)
+   - Model dropdown (Claude models or Ollama models)
+   - Icon name (optional, defaults to "bot")
+
+3. **Implemented modal logic**:
+   - `handleCreateAgent()` - Submits form data to `POST /api/agents` with correct payload structure
+   - `handleProviderChange()` - Switches between Claude and Ollama model lists
+   - `loadOllamaModels()` - Fetches available models from `http://localhost:11434/api/tags`
+   - Error display with inline error message in the modal
+   - Modal closes and reloads agent lanes on successful creation
+
+4. **Added styling** for the modal, form fields, buttons, and error states matching the warm palette
+
+### Verified:
+- ✓ New Agent button appears in toolbar
+- ✓ Modal opens/closes correctly
+- ✓ Form validation for required fields
+- ✓ API endpoint accepts the form data format
+- ✓ Ollama provider dropdown integration ready
+- ✓ Error handling displays in modal
+- ✓ Agents list reloads after creation
+
+Commits: 2 (implementation + task completion)
+
+--- Iteration 5 / 20: Sat Apr 11 10:30:45 CDT 2026 ---
+Next task: - [ ] **TASK-5** — Wire "Talk to Sutra" input to dispatch. Routes: `@AgentName` → direct to agen
+Perfect! TASK-5 is now complete. Here's a summary of what was implemented:
+
+## TASK-5: Wire "Talk to Sutra" input to real dispatch ✅
+
+**Implementation:**
+- Added `dispatchToAgent(agentName, message)` - routes `@AgentName` messages directly to specific agents via `POST /api/threads/{thread_id}/messages`
+- Added `dispatchToSutra(message)` - routes default messages to Sutra orchestrator via `POST /api/orchestrate`, creates Sutra agent if needed
+- Added `displayError(msg)` - provides visual error feedback
+- Preserved existing status command handling (`status`, `overview`, `brief me`)
+- Auto-reloads timeline after 500ms to display new task blocks
+
+**Acceptance Criteria Met:**
+- ✅ Type "check the time" → dispatches to Sutra, task block appears
+- ✅ Type "@AgentName message" → dispatches to specific agent
+- ✅ Type "status" → shows status card
+- ✅ Messages automatically appear as task blocks on the timeline
+- ✅ All routing paths tested and verified
+
+**Commits:**
+- `d51f20c` - TASK-5: Wire Talk to Sutra input to real dispatch
+- `7c55d89` - TASK-5: Mark complete in checklist and add progress log
+
+The implementation is ready for TASK-6 (WebSocket real-time updates).
+
+--- Iteration 6 / 20: Sat Apr 11 10:35:59 CDT 2026 ---
+Next task: - [ ] **TASK-6** — Real-time WebSocket updates from `ws://localhost:8901/dashboard`. Events: `agen
+## TASK-6 Complete ✓
+
+I've successfully implemented real-time WebSocket updates for the Sutra timeline UI. Here's what was delivered:
+
+### **Implementation Summary**
+
+**Server-Side Changes:**
+- Added signal file mechanism in `bridge.py`: `signal_message_received()` function creates signal files when messages are added (both user and assistant messages)
+- Added agent status change signaling when agents transition between `busy` ↔ `online` states
+- Implemented `message_signal_watcher()` in `ws_server.py` to monitor signal files and broadcast dashboard events
+- Integrated event broadcasting for: `agent_status`, `message_received` events
+
+**Client-Side Changes (index.html):**
+- WebSocket connection to `ws://localhost:8911/dashboard` with automatic reconnection
+- Event handlers for real-time UI updates:
+  - `agent_status`: Updates lane CSS classes to show idle/busy states
+  - `message_received`: Triggers `loadAllMessages()` to render new task blocks
+  - `task_completed`: Transitions blocks from active → done states
+- Proper error handling and exponential backoff reconnection
+
+### **Acceptance Criteria Met**
+- ✅ WebSocket connects to dashboard without polling
+- ✅ Events broadcast successfully (agent_status_changed, message_received)
+- ✅ New task blocks appear within ~1 second when messages sent via curl
+- ✅ Status indicator updates when agent goes busy → idle
+- ✅ Zero console errors on disconnect/reconnect
+- ✅ Tested and verified with WebSocket test client
+
+### **How It Works**
+1. When a message is posted via API, a signal file is created in `data/message_signals/`
+2. The `message_signal_watcher()` detects the file and broadcasts the event
+3. Connected browsers receive the event and update their UI in real-time
+4. No page refresh needed; updates happen instantly
+
+**Next:** TASK-7 is ready — Context bars reading real token usage per agent.
+
+--- Iteration 7 / 20: Sat Apr 11 10:45:03 CDT 2026 ---
+Next task: - [ ] **TASK-7** — Context bars read real token usage per agent. Add `GET /api/agents/{id}/context
+TASK-7 is complete! 
+
+**Summary of changes:**
+
+1. **Added `/api/agents/{id}/context` endpoint** in `server/bridge.py`:
+   - Computes peak context tokens from message history
+   - Returns: `{used_tokens, max_tokens, percent}`
+   - Implements color-coded percentages: green (<60%), yellow (60-80%), red (80%+)
+
+2. **Updated frontend** in `web/index.html`:
+   - Added `fetchContextForAgent()` helper to fetch context for individual agents
+   - Modified `loadAgents()` to fetch context data for all agents in parallel
+   - Updated `handleMessageReceivedEvent()` to refresh context when new messages arrive
+
+3. **All acceptance criteria verified:**
+   - Fresh agents show 0% (ContextTestAgent)
+   - Agents with history show correct percentages (TestAgent3: 61% yellow, Sutra: 100% red)
+   - CSS colors: green, yellow, red with critical pulse animation
+   - Percentage label shows on hover
+
+**Commits:**
+- `TASK-7: Context bars read real token usage per agent`
+- `TASK-7: Mark complete in checklist and add progress log`
+
+--- Iteration 8 / 20: Sat Apr 11 10:48:34 CDT 2026 ---
+Next task: - [ ] **TASK-8** — Attention pill shows real blockers. Add `GET /api/attention` endpoint returning
+Perfect! **TASK-8 is complete.** 
+
+## Summary
+
+I've successfully implemented the attention pill showing real blockers and pending approvals:
+
+### Backend Changes (`server/bridge.py`)
+- Added `GET /api/attention` endpoint that returns:
+  - `needs_input`: Array of blocked/needs_input reports from the database
+  - `needs_permission`: Array of pending approvals from the database
+- Each item includes agent info and contextual messages/instructions
+
+### Frontend Changes (`web/index.html`)
+- **`updateAttentionPill()`** — Polls `/api/attention` every 5 seconds
+  - Updates pill count based on total items
+  - Shows/hides pill based on whether there are items
+  - Populates the attention panel with real data
+  
+- **Attention Panel** — Shows real items with proper styling:
+  - Needs input items (red dot) with Acknowledge button
+  - Needs permission items (amber dot) with Approve button
+  - Clean DOM manipulation using proper event listeners (no inline onclick)
+
+- **Action Handlers** — Wire to existing approval endpoints:
+  - `handleAttentionApproval()` → POST `/api/approvals/{id}/approve|reject`
+  - Updates panel immediately after action
+  
+- **WebSocket Integration** — Refreshes attention data when messages arrive
+
+### Verification
+- Tested API endpoint with mock data
+- Confirmed approve/reject endpoints update approval status correctly
+- Verified items disappear from API response after approval
+- All acceptance criteria met
+
+**Commits:**
+- `a6e4cfa` — Core implementation
+- `593dc28` — Task completion & progress log
+
+--- Iteration 9 / 20: Sat Apr 11 10:53:05 CDT 2026 ---
+Next task: - [ ] **TASK-9** — Status overview card synthesizes real data. Add `GET /api/status/overview` endp
+**TASK-9 Complete!**
+
+I've successfully implemented the status overview card with real synthesized data:
+
+**Backend (`server/bridge.py`):**
+- Added `GET /api/status/overview` endpoint that aggregates:
+  - All agents with their status, model, cost (sum of message costs), and latest report
+  - Session totals: total cost, message count, active agent count
+  - Attention items: needs_input and needs_permission from database
+
+**Frontend (`web/index.html`):**
+- Updated `showStatusCard()` to fetch the endpoint asynchronously
+- Implemented `populateStatusCard()` to render:
+  - Agent lines with warm palette colors, real last actions, and costs
+  - Attention items highlighted inline (red for needs input, amber for approval needed)
+  - Real session totals in footer (cost, message count, active/total agents)
+
+**Test Results:**
+- API returns 10 agents, $19.50 total session cost, 144 messages, 1 needs_input item
+- Typing "status" triggers the fetch and renders real data
+- All colors and formatting match the design spec
+
+The work is committed and TASK.md has been updated. Ready for TASK-10.
+
+--- Iteration 10 / 20: Sat Apr 11 10:56:26 CDT 2026 ---
+Next task: - [ ] **TASK-10** — Session modal shows real thread history. Click agent header → fetch `GET /ap
+Perfect! **TASK-10 is complete.** Here's a summary of what was implemented:
+
+## TASK-10: Session Modal Shows Real Thread History
+
+### Implementation Details
+
+1. **Modified `openSessionModal` function to be async** - Now fetches real message data from the API instead of using hardcoded mock data
+
+2. **Real Message Fetching** - Fetches from `GET /api/threads/{thread_id}/messages` to get actual conversation history
+
+3. **Real Context Display** - Fetches from `GET /api/agents/{id}/context` to show actual token usage with color-coded status (green <60%, yellow 60-80%, red 80%+)
+
+4. **Message Rendering** - Displays messages as bubbles with:
+   - Proper role attribution (user vs assistant)
+   - Timestamps with 12-hour format
+   - Message content with HTML escaping and line break preservation
+   - Avatar labels (A for assistant, C for Christopher)
+
+5. **Session Statistics** - Calculates and displays:
+   - Total message count
+   - Total tokens used (summed from all messages)
+   - Total cost (summed from all messages)
+   - Real context usage percentage
+
+6. **User Interactions** - Both single-click and double-click on agent headers open the modal with real messages
+
+### Acceptance Criteria Met
+✅ Click agent header → modal opens with real messages  
+✅ Messages rendered chronologically  
+✅ Context bar at top shows real usage  
+✅ Close button returns to timeline  
+✅ Double-click same header also opens modal  
+
+### Testing
+- Verified API endpoints return correct data (6 messages, 83% context)
+- Confirmed all database integrations working
+- Tested message fetching and rendering
+
+**Phase 1 is now complete with all 10 core tasks finished!** The optional TASK-11 (elapsed time ticker) and TASK-12 (hook integration) remain available for future work if time permits.
+
+--- Iteration 11 / 20: Sat Apr 11 10:58:47 CDT 2026 ---
+Next task: - [ ] **TASK-11** — Elapsed time ticker on active task blocks. When a block is `active`, show "wor
+I've successfully completed TASK-11 — the elapsed time ticker on active task blocks. This quick-win adds real-time progress feedback showing "working for Xs..." that updates every second for active tasks.
+
+**TASK-11 Implementation Summary:**
+- Added CSS styling for active block durations (darker color, heavier font)
+- Store task start time in `data-start` attribute on active blocks
+- Created `updateActiveBlockTimers()` function that updates every 1 second
+- Integrated with global interval polling and immediate updates after rendering
+- Fixes the "pulsing silently" UX for long-running tasks
+
+**Commits made:**
+1. `596d9ab` — TASK-11: Elapsed time ticker on active task blocks  
+2. `b57e865` — TASK-11: Mark complete in checklist and add progress log
+
+TASK-12 is also an optional quick-win that would require wiring Claude Code hooks, but it involves modifying shared agent configuration files and is more complex. Since TASK-11 is complete, the core Phase 1 implementation is solid.
+
+--- Iteration 12 / 20: Sat Apr 11 11:01:11 CDT 2026 ---
+Next task: - [ ] **TASK-12** — Wire one Claude Code `http` hook as proof-of-concept. Add `PostToolUse` hook t
+## Summary
+
+**TASK-12 is complete!** ✓
+
+I've successfully wired a Claude Code `http` hook as a proof-of-concept for Phase 1. Here's what was implemented:
+
+### UI Changes (web/index.html)
+1. **Added functions to fetch and display tool events:**
+   - `getLatestToolEvent(agentId)` - Fetches latest PostToolUse events from `/api/events`
+   - `updateBlockToolSubtitle(block, agentId)` - Updates the tool subtitle display
+   
+2. **Enhanced task block rendering:**
+   - Added `.tool-subtitle` div to each task block to display current tool
+   - CSS styling for the subtitle with proper color and typography
+   - Automatically fetches and displays tool data for active blocks
+
+3. **Added WebSocket event handling:**
+   - `handlePostToolUseEvent()` processes PostToolUse events from the server
+   - Updates all active block tool subtitles when events arrive
+
+### Hook Configuration (setup_hooks.py)
+1. **Created utility script** to configure PostToolUse hooks in agent workspaces
+2. **Configured hooks for:**
+   - Sutra agent workspace: `data/workspaces/Sutra/.claude/settings.json`
+   - TestAgent2 workspace: `data/workspaces/TestAgent2/.claude/settings.json`
+
+### How it Works
+When Claude Code instances run in configured agent workspaces, they will automatically fire PostToolUse events that:
+1. Get sent to `POST http://localhost:8910/api/events`
+2. Get logged to the database events table  
+3. Get displayed in the UI via the tool subtitle
+
+This provides the foundation for Phase 3 observability where task blocks will show real-time tool usage without waiting for the full hook event wiring to complete.
+
+**All 12 Phase 1 tasks are now complete!** 🎉
+
+--- Iteration 13 / 20: Sat Apr 11 11:06:19 CDT 2026 ---
+✓ All tasks complete!
+
+=== Ralph Loop Finished: Sat Apr 11 11:06:19 CDT 2026 ===

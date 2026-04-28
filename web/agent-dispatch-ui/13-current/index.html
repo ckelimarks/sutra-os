@@ -20,7 +20,7 @@
     --red: #c4594c;
 
     /* muted paint chips */
-    --ln:  #6a8fb3;           /* CPA  - slate blue */
+    --ln:  #6a8fb3;           /* LoveNotes  - slate blue */
     --hg:  #7a9e78;           /* HG         - sage */
     --ct:  #b88a6a;           /* Content    - clay */
     --lf:  #8a7ba8;           /* Life       - dusty lilac */
@@ -473,7 +473,7 @@
   <div class="rail">
     <div class="rail-label">dispatch</div>
     <div class="area-picker" id="areaPicker">
-      <button data-area="ln" class="active">CPA</button>
+      <button data-area="ln" class="active">LoveNotes</button>
       <button data-area="hg">HG</button>
       <button data-area="ct">Content</button>
       <button data-area="lf">Life</button>
@@ -493,7 +493,7 @@
    --------------------------------------------------------------------------- */
 
 const AREAS = {
-  ln: { key: 'ln', name: 'CPA', meta: 'sms · ai',       accent: 'var(--ln)' },
+  ln: { key: 'ln', name: 'LoveNotes', meta: 'sms · ai',       accent: 'var(--ln)' },
   hg: { key: 'hg', name: 'HG',        meta: 'coaching',       accent: 'var(--hg)' },
   ct: { key: 'ct', name: 'Content',   meta: 'writing',        accent: 'var(--ct)' },
   lf: { key: 'lf', name: 'Life',      meta: 'personal',       accent: 'var(--lf)' },
@@ -522,7 +522,7 @@ const state = {
    duration: seconds of work (=> width)
 */
 const seed = [
-  // --- CPA ---
+  // --- LoveNotes ---
   { area: 'ln', title: 'review PR #482 — streak reset bug',           offsetSec: -110, duration: 55 },
   { area: 'ln', title: 'triage Supabase webhook retries',              offsetSec: -40,  duration: 35, state: 'done' },
   { area: 'ln', title: 'draft onboarding SMS copy (v3)',               offsetSec: -15,  duration: 60, state: 'running' },

@@ -36,7 +36,7 @@
   --ok:         #6fe1b1;
 
   /* Lane hues (Bases) — muted tint applied as radial glow */
-  --ln-hue: 320;    /* CPA — magenta/rose */
+  --ln-hue: 320;    /* LoveNotes — magenta/rose */
   --hg-hue: 190;    /* HG — cool cyan-teal */
   --content-hue: 50; /* Content — amber-gold */
   --life-hue: 150;  /* Life — sage green */
@@ -296,7 +296,7 @@ body::before {
 .lane:last-child { border-bottom: none; }
 
 /* Subtle per-lane radial glow — very muted */
-.lane[data-id="cpa"] {
+.lane[data-id="lovenotes"] {
   background:
     radial-gradient(ellipse at 15% 50%, hsla(var(--ln-hue), 55%, 40%, 0.11), transparent 55%),
     linear-gradient(180deg, hsla(var(--ln-hue), 30%, 10%, 0.3), transparent 90%);
@@ -331,7 +331,7 @@ body::before {
   text-transform: uppercase;
   color: var(--ink-0);
 }
-.lane[data-id="cpa"] .lane-head .name { color: hsl(var(--ln-hue), 50%, 78%); }
+.lane[data-id="lovenotes"] .lane-head .name { color: hsl(var(--ln-hue), 50%, 78%); }
 .lane[data-id="hg"] .lane-head .name        { color: hsl(var(--hg-hue), 50%, 78%); }
 .lane[data-id="content"] .lane-head .name   { color: hsl(var(--content-hue), 55%, 74%); }
 .lane[data-id="life"] .lane-head .name      { color: hsl(var(--life-hue), 45%, 74%); }
@@ -375,7 +375,7 @@ body::before {
   backdrop-filter: blur(4px);
   transition: box-shadow .25s ease, transform .2s ease, border-color .25s ease;
 }
-.lane[data-id="cpa"] .task {
+.lane[data-id="lovenotes"] .task {
   border-color: hsla(var(--ln-hue), 55%, 55%, 0.5);
   box-shadow: 0 0 0 1px hsla(var(--ln-hue), 60%, 45%, 0.08), 0 4px 18px rgba(0,0,0,0.45);
 }
@@ -422,7 +422,7 @@ body::before {
   background: var(--ink-2);
   box-shadow: 0 0 0 2px rgba(255,255,255,0.03);
 }
-.lane[data-id="cpa"] .task .glyph { background: hsl(var(--ln-hue), 55%, 65%); }
+.lane[data-id="lovenotes"] .task .glyph { background: hsl(var(--ln-hue), 55%, 65%); }
 .lane[data-id="hg"] .task .glyph        { background: hsl(var(--hg-hue), 55%, 65%); }
 .lane[data-id="content"] .task .glyph   { background: hsl(var(--content-hue), 60%, 62%); }
 .lane[data-id="life"] .task .glyph      { background: hsl(var(--life-hue), 50%, 62%); }
@@ -679,7 +679,7 @@ body::before {
              placeholder="Type an idea — then Enter…"
              autocomplete="off" spellcheck="false" />
       <div class="lane-pick" id="lanePick">
-        <button data-lane="cpa">CPA</button>
+        <button data-lane="lovenotes">LoveNotes</button>
         <button data-lane="hg">HG</button>
         <button data-lane="content">Content</button>
         <button data-lane="life">Life</button>
@@ -723,10 +723,10 @@ body::before {
   <div class="stage" id="stage">
     <div class="lanes" id="lanes">
 
-      <div class="lane" data-id="cpa">
+      <div class="lane" data-id="lovenotes">
         <div class="lane-head">
-          <span class="name">CPA</span>
-          <span class="meta mono" data-count-for="cpa">0 active</span>
+          <span class="name">LoveNotes</span>
+          <span class="meta mono" data-count-for="lovenotes">0 active</span>
         </div>
         <div class="ticks"></div>
         <div class="growth">
@@ -821,18 +821,18 @@ body::before {
    ============================================================ */
 
 const LANES = [
-  { id: 'cpa', name: 'CPA', hue: 320 },
+  { id: 'lovenotes', name: 'LoveNotes', hue: 320 },
   { id: 'hg',        name: 'HG',        hue: 190 },
   { id: 'content',   name: 'Content',   hue: 50  },
   { id: 'life',      name: 'Life',      hue: 150 },
 ];
 
 const AGENTS = [
-  { id: 'A1', name: 'AR', spec: 'cpa' },
+  { id: 'A1', name: 'AR', spec: 'lovenotes' },
   { id: 'A2', name: 'BK', spec: 'hg' },
   { id: 'A3', name: 'CV', spec: 'content' },
   { id: 'A4', name: 'DL', spec: 'life' },
-  { id: 'A5', name: 'EM', spec: 'cpa' },
+  { id: 'A5', name: 'EM', spec: 'lovenotes' },
   { id: 'A6', name: 'FP', spec: 'content' },
   { id: 'A7', name: 'GN', spec: null },
   { id: 'A8', name: 'HS', spec: null },
@@ -840,7 +840,7 @@ const AGENTS = [
 
 const state = {
   tasks: [],
-  selectedLane: 'cpa',
+  selectedLane: 'lovenotes',
   now: Date.now(),
   startedAt: Date.now(),
   resources: {
@@ -857,9 +857,9 @@ const LOOKBACK_MS  = 90 * 1000;
 const LOOKAHEAD_MS = 40 * 1000;
 
 const SEED_TASKS = [
-  { lane:'cpa', label:'Review PR #482 — reminder scheduler refactor', agent:'A1', startOffset:-22000, dur: 55000, progress: 0.40 },
-  { lane:'cpa', label:'Draft reply to Sarah re: contract redlines',    agent:'A5', startOffset:-8000,  dur: 28000, progress: 0.28, needsInput:true },
-  { lane:'cpa', label:'Triage Supabase auth errors (last 24h)',        agent:null, startOffset:12000,  dur: 35000, progress: 0 },
+  { lane:'lovenotes', label:'Review PR #482 — reminder scheduler refactor', agent:'A1', startOffset:-22000, dur: 55000, progress: 0.40 },
+  { lane:'lovenotes', label:'Draft reply to Sarah re: contract redlines',    agent:'A5', startOffset:-8000,  dur: 28000, progress: 0.28, needsInput:true },
+  { lane:'lovenotes', label:'Triage Supabase auth errors (last 24h)',        agent:null, startOffset:12000,  dur: 35000, progress: 0 },
   { lane:'hg', label:'Summarize client intake call — action items', agent:'A2', startOffset:-30000, dur: 40000, progress: 0.75 },
   { lane:'hg', label:'Draft Q2 OKRs — coaching program',            agent:null, startOffset:8000,   dur: 50000, progress: 0 },
   { lane:'content', label:'Outline essay: "Attention is the asset"',     agent:'A3', startOffset:-45000, dur: 60000, progress: 0.85 },
@@ -869,7 +869,7 @@ const SEED_TASKS = [
 ];
 
 const SEED_DONE = {
-  cpa: 9,
+  lovenotes: 9,
   hg: 5,
   content: 11,
   life: 6,
@@ -915,7 +915,7 @@ lanePickEl.addEventListener('click', (e) => {
   setLane(btn.dataset.lane);
   taskInput.focus();
 });
-setLane('cpa');
+setLane('lovenotes');
 
 /* ---------- Dispatch input ---------- */
 taskInput.addEventListener('keydown', (e) => {
@@ -932,7 +932,7 @@ taskInput.addEventListener('keydown', (e) => {
 
 taskInput.addEventListener('input', () => {
   const v = taskInput.value.toLowerCase();
-  if (/\b(pr|supabase|sms|reminder|webhook|auth|love\s*notes|cpa)\b/.test(v)) setLane('cpa');
+  if (/\b(pr|supabase|sms|reminder|twilio|auth|love\s*notes|lovenotes)\b/.test(v)) setLane('lovenotes');
   else if (/\b(hg|client|coaching|intake|okr|session)\b/.test(v)) setLane('hg');
   else if (/\b(essay|post|substack|draft|outline|article|newsletter)\b/.test(v)) setLane('content');
   else if (/\b(dentist|appt|bill|grocery|receipt|life|household|book\s)\b/.test(v)) setLane('life');
@@ -1406,10 +1406,10 @@ function simTick() {
   }
 
   if (Math.random() < 0.05) {
-    const lanes = ['cpa','hg','content','life'];
+    const lanes = ['lovenotes','hg','content','life'];
     const laneId = lanes[Math.floor(Math.random() * lanes.length)];
     const phr = {
-      cpa: ['patch Webhook rate limit bug','write release notes v0.9','reply to beta user #12','audit reminder queue'],
+      lovenotes: ['patch Twilio rate limit bug','write release notes v0.9','reply to beta user #12','audit reminder queue'],
       hg:        ['prep next client session','draft check-in email','review coaching recording','update client roadmap'],
       content:   ['outline next post','pull quotes from book','schedule Substack','draft tweet thread'],
       life:      ['renew car registration','reply to mom','pay internet bill','plan weekend']
@@ -1448,7 +1448,7 @@ setInterval(simTick, 2000);
 // Periodic graph growth (subtle background accretion — "still being thought about")
 setInterval(() => {
   const roll = Math.random();
-  if (roll < 0.4) addGrowthNode('cpa');
+  if (roll < 0.4) addGrowthNode('lovenotes');
   else if (roll < 0.7) addGrowthNode('content');
   else if (roll < 0.85) addGrowthNode('hg');
   else addGrowthNode('life');

@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Depth Layers</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: rgba(255,255,255,0.04);
+    --surface-hover: rgba(255,255,255,0.08);
+    --glass: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.1);
+    --text: #e8e8ed;
+    --text-dim: rgba(255,255,255,0.45);
+    --text-muted: rgba(255,255,255,0.3);
+    --accent: #7c6aef;
+    --accent-glow: rgba(124,106,239,0.35);
+    --green: #34d399;
+    --green-glow: rgba(52,211,153,0.3);
+    --amber: #fbbf24;
+    --amber-glow: rgba(251,191,36,0.3);
+    --red: #f87171;
+    --blue: #60a5fa;
+    --cyan: #22d3ee;
+    --pink: #f472b6;
+    --orange: #fb923c;
+    --layer-transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ─── Background Agent Grid Layer ─── */
+  #agent-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 16px;
+    filter: blur(1.5px);
+    opacity: 0.38;
+    transition: filter var(--layer-transition), opacity var(--layer-transition);
+    pointer-events: none;
+  }
+
+  body.agent-focused #agent-layer {
+    filter: blur(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body.agent-focused #sutra-layer {
+    filter: blur(2px);
+    opacity: 0.2;
+    pointer-events: none;
+  }
+
+  body:not(.agent-focused) #agent-layer {
+    pointer-events: auto;
+  }
+
+  /* ─── Agent Cards ─── */
+  .agent-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--layer-transition);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .agent-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+
+  .agent-card.working::before {
+    opacity: 1;
+    animation: pulse-border 2.5s ease-in-out infinite;
+  }
+
+  .agent-card.complete::before {
+    box-shadow: inset 0 0 20px var(--green-glow), 0 0 15px var(--green-glow);
+    opacity: 1;
+    animation: glow-complete 1.5s ease-in-out 3;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: inset 0 0 12px rgba(124,106,239,0.15); }
+    50% { box-shadow: inset 0 0 20px rgba(124,106,239,0.35); }
+  }
+
+  @keyframes glow-complete {
+    0%, 100% { box-shadow: inset 0 0 12px var(--green-glow); }
+    50% { box-shadow: inset 0 0 28px var(--green-glow), 0 0 12px var(--green-glow); }
+  }
+
+  .agent-card.focused {
+    position: fixed;
+    inset: 60px 320px 80px 320px;
+    z-index: 100;
+    opacity: 1;
+    filter: none;
+    padding: 28px;
+    background: rgba(16,16,24,0.95);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    display: flex;
+    flex-direction: column;
+    cursor: default;
+  }
+
+  .agent-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .agent-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+
+  .agent-name {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .agent-status {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.working {
+    background: var(--amber);
+    animation: dot-pulse 1.5s ease-in-out infinite;
+  }
+
+  .status-dot.complete { background: var(--green); }
+  .status-dot.idle { background: var(--text-muted); }
+  .status-dot.error { background: var(--red); }
+
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .agent-task {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .agent-preview {
+    font-size: 10px;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 8px;
+    line-height: 1.5;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    overflow: hidden;
+    max-height: 48px;
+  }
+
+  .agent-files {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .agent-file-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* ─── Sutra Conversation Layer ─── */
+  #sutra-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: filter var(--layer-transition), opacity var(--layer-transition);
+    pointer-events: auto;
+  }
+
+  #sutra-layer.dimmed {
+    filter: blur(2px);
+    opacity: 0.15;
+    pointer-events: none;
+  }
+
+  .sutra-header {
+    padding: 20px 0 8px;
+    text-align: center;
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .sutra-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0.7;
+  }
+
+  .sutra-subtitle {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  .conversation {
+    flex: 1;
+    width: 100%;
+    max-width: 680px;
+    overflow-y: auto;
+    padding: 16px 24px 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+
+  .conversation::-webkit-scrollbar { width: 4px; }
+  .conversation::-webkit-scrollbar-track { background: transparent; }
+  .conversation::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  /* ─── Messages ─── */
+  .msg {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    position: relative;
+    animation: msg-in 0.3s ease-out;
+  }
+
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 6px;
+  }
+
+  .msg.sutra {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--glass-border);
+    border-bottom-left-radius: 6px;
+    backdrop-filter: blur(8px);
+  }
+
+  .msg .sender {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    opacity: 0.6;
+  }
+
+  .msg.sutra .sender { color: var(--accent); }
+
+  .msg .agent-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .msg .agent-tag:hover {
+    background: rgba(255,255,255,0.12);
+  }
+
+  .msg .reply-btn {
+    position: absolute;
+    right: -36px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    font-size: 12px;
+  }
+
+  .msg:hover .reply-btn { opacity: 1; }
+  .msg .reply-btn:hover { background: var(--surface-hover); color: var(--text); }
+
+  /* ─── File Chips ─── */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-top: 8px;
+    cursor: default;
+  }
+
+  .file-chip .file-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: rgba(96,165,250,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  .file-chip .file-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+  }
+
+  .file-chip .file-action {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-dim);
+    transition: all 0.15s;
+  }
+
+  .file-chip .file-action:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--text);
+  }
+
+  /* ─── Routing Indicator ─── */
+  .routing-indicator {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 10px;
+    background: rgba(124,106,239,0.08);
+    border: 1px solid rgba(124,106,239,0.15);
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .routing-indicator .route-arrow {
+    font-size: 10px;
+    opacity: 0.5;
+  }
+
+  .routing-dots {
+    display: flex;
+    gap: 3px;
+  }
+
+  .routing-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: route-dot 1.2s ease-in-out infinite;
+  }
+
+  .routing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .routing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes route-dot {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  /* ─── Input Bar ─── */
+  .input-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 680px;
+    max-width: calc(100% - 48px);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(20,20,30,0.85);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+  }
+
+  .input-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    padding: 6px 4px;
+  }
+
+  .input-bar input::placeholder { color: var(--text-muted); }
+
+  .input-bar .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .input-bar .send-btn:hover { transform: scale(1.05); }
+  .input-bar .send-btn:active { transform: scale(0.95); }
+
+  .input-bar .context-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent);
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(124,106,239,0.12);
+    border: 1px solid rgba(124,106,239,0.2);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .input-bar .context-label:hover { background: rgba(124,106,239,0.2); }
+
+  .input-bar .context-label.agent-context {
+    color: var(--cyan);
+    background: rgba(34,211,238,0.1);
+    border-color: rgba(34,211,238,0.2);
+  }
+
+  /* ─── Back to Sutra Overlay ─── */
+  .back-overlay {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    padding: 8px 20px;
+    border-radius: 10px;
+    background: rgba(16,16,24,0.9);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .back-overlay:hover {
+    color: var(--text);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  .back-overlay kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 10px;
+    font-family: 'SF Mono', monospace;
+    margin-left: 8px;
+    vertical-align: 1px;
+  }
+
+  body.agent-focused .back-overlay { display: block; }
+
+  /* ─── Focused Agent Chat ─── */
+  .focused-chat {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .agent-card.focused .focused-chat { display: flex; }
+  .agent-card.focused .agent-task,
+  .agent-card.focused .agent-preview,
+  .agent-card.focused .agent-files { display: none; }
+
+  .focused-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+
+  .focused-messages::-webkit-scrollbar { width: 4px; }
+  .focused-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  .focused-msg {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 90%;
+  }
+
+  .focused-msg.from-agent {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .focused-msg.from-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .focused-msg .f-sender {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    opacity: 0.5;
+  }
+
+  /* ─── Parallax container ─── */
+  #parallax-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    transition: transform 0.15s ease-out;
+  }
+
+  /* ─── Scrollbar global ─── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="parallax-container">
+  <!-- Background Agent Grid -->
+  <div id="agent-layer">
+
+    <!-- Agent 1: Code Writer — Working -->
+    <div class="agent-card working" data-agent="code-writer" id="agent-code-writer">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(124,106,239,0.2);color:var(--accent);">CW</div>
+        <div class="agent-name">Code Writer</div>
+        <div class="agent-status">
+          <span class="status-dot working"></span>
+          <span style="color:var(--amber)">Working</span>
+        </div>
+      </div>
+      <div class="agent-task">Implementing authentication middleware for the Express server. Adding JWT validation and refresh token rotation.</div>
+      <div class="agent-preview">const authMiddleware = async (req, res, next) =&gt; {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401)...</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="auth.ts">TS</div>
+        <div class="agent-file-icon" title="middleware.ts">TS</div>
+        <div class="agent-file-icon" title="types.d.ts">DT</div>
+      </div>
+    </div>
+
+    <!-- Agent 2: Researcher — Complete -->
+    <div class="agent-card complete" data-agent="researcher" id="agent-researcher">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(52,211,153,0.2);color:var(--green);">RS</div>
+        <div class="agent-name">Researcher</div>
+        <div class="agent-status">
+          <span class="status-dot complete"></span>
+          <span style="color:var(--green)">Complete</span>
+        </div>
+      </div>
+      <div class="agent-task">Competitor analysis for LoveNotes. Mapped 14 relationship apps across pricing, feature set, and retention metrics.</div>
+      <div class="agent-preview">Key finding: No competitor offers AI-curated appreciation prompts. Closest: Lasting ($79/yr) focuses on conflict resolution...</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="competitor-analysis.md">MD</div>
+      </div>
+    </div>
+
+    <!-- Agent 3: Debugger — Working -->
+    <div class="agent-card working" data-agent="debugger" id="agent-debugger">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(248,113,113,0.2);color:var(--red);">DB</div>
+        <div class="agent-name">Debugger</div>
+        <div class="agent-status">
+          <span class="status-dot working"></span>
+          <span style="color:var(--amber)">Working</span>
+        </div>
+      </div>
+      <div class="agent-task">Tracing memory leak in the WebSocket connection pool. Heap snapshots show retained listeners after disconnect events.</div>
+      <div class="agent-preview">Suspect: event listeners not removed in ws.on('close'). Heap diff shows +2.4MB per 100 connections over 10 min window.</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="ws-pool.ts">TS</div>
+      </div>
+    </div>
+
+    <!-- Agent 4: Planner — Idle -->
+    <div class="agent-card" data-agent="planner" id="agent-planner">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(96,165,250,0.2);color:var(--blue);">PL</div>
+        <div class="agent-name">Planner</div>
+        <div class="agent-status">
+          <span class="status-dot idle"></span>
+          <span>Idle</span>
+        </div>
+      </div>
+      <div class="agent-task">Last task: Sprint planning for LoveNotes v4.2. Created 3-week roadmap with milestones and dependencies.</div>
+      <div class="agent-preview">Awaiting input...</div>
+      <div class="agent-files"></div>
+    </div>
+
+    <!-- Agent 5: Designer — Working -->
+    <div class="agent-card working" data-agent="designer" id="agent-designer">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(244,114,182,0.2);color:var(--pink);">DS</div>
+        <div class="agent-name">Designer</div>
+        <div class="agent-status">
+          <span class="status-dot working"></span>
+          <span style="color:var(--amber)">Working</span>
+        </div>
+      </div>
+      <div class="agent-task">Generating component library for the onboarding flow. Building Figma-to-code token system for spacing and color.</div>
+      <div class="agent-preview">tokens: { space: { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 }, radius: { sm: 6, md: 12, lg: 20 } }</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="tokens.json">JS</div>
+        <div class="agent-file-icon" title="Onboarding.tsx">TX</div>
+      </div>
+    </div>
+
+    <!-- Agent 6: Writer — Complete -->
+    <div class="agent-card complete" data-agent="writer" id="agent-writer">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(251,191,36,0.2);color:var(--amber);">WR</div>
+        <div class="agent-name">Writer</div>
+        <div class="agent-status">
+          <span class="status-dot complete"></span>
+          <span style="color:var(--green)">Complete</span>
+        </div>
+      </div>
+      <div class="agent-task">Blog post draft: "Why I Built a Personal OS." 1,800 words covering the motivation, architecture, and daily workflow.</div>
+      <div class="agent-preview">Most productivity tools fail because they model work as a list. Real work is a graph of dependencies, energy, and context...</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="personal-os-post.md">MD</div>
+      </div>
+    </div>
+
+    <!-- Agent 7: Analyst — Working -->
+    <div class="agent-card working" data-agent="analyst" id="agent-analyst">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(34,211,238,0.2);color:var(--cyan);">AN</div>
+        <div class="agent-name">Analyst</div>
+        <div class="agent-status">
+          <span class="status-dot working"></span>
+          <span style="color:var(--amber)">Working</span>
+        </div>
+      </div>
+      <div class="agent-task">Running cohort analysis on LoveNotes trial users. Segmenting by signup source, curriculum version, and engagement frequency.</div>
+      <div class="agent-preview">v4 cohort: 62% 7-day retention, 18% 30-day
+v4.1 cohort: 89% 7-day, 4% 30-day (completion trap)</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="cohort-data.csv">CV</div>
+        <div class="agent-file-icon" title="analysis.py">PY</div>
+      </div>
+    </div>
+
+    <!-- Agent 8: DevOps — Idle -->
+    <div class="agent-card" data-agent="devops" id="agent-devops">
+      <div class="agent-header">
+        <div class="agent-icon" style="background:rgba(251,146,60,0.2);color:var(--orange);">DO</div>
+        <div class="agent-name">DevOps</div>
+        <div class="agent-status">
+          <span class="status-dot idle"></span>
+          <span>Idle</span>
+        </div>
+      </div>
+      <div class="agent-task">Last task: Configured Supabase migration pipeline. Verified edge function deployments across staging and prod.</div>
+      <div class="agent-preview">All services green. Last deploy: 2h ago.</div>
+      <div class="agent-files">
+        <div class="agent-file-icon" title="deploy.yml">YM</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Sutra Conversation Layer -->
+<div id="sutra-layer">
+  <div class="sutra-header">
+    <div class="sutra-title">Sutra</div>
+    <div class="sutra-subtitle">8 agents active -- 4 working, 2 complete, 2 idle</div>
+  </div>
+
+  <div class="conversation" id="conversation">
+
+    <div class="msg user">
+      I need to ship the auth system today and also figure out why LoveNotes trials aren't converting.
+    </div>
+
+    <div class="routing-indicator">
+      <span class="route-arrow">&rarr;</span> Routing to Code Writer, Analyst
+      <div class="routing-dots"><span></span><span></span><span></span></div>
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      I've split this into two parallel tracks. <strong>Code Writer</strong> is implementing the auth middleware with JWT validation and refresh token rotation. <strong>Analyst</strong> is pulling cohort data from LoveNotes to identify the conversion drop-off point.
+    </div>
+
+    <div class="msg user">
+      Can you also run a competitor analysis on relationship apps? I want to know what's out there.
+    </div>
+
+    <div class="routing-indicator">
+      <span class="route-arrow">&rarr;</span> Routing to Researcher
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      <div class="agent-tag" data-focus-agent="researcher">
+        <span class="status-dot complete"></span>
+        Researcher
+      </div>
+      Done. Researcher mapped 14 relationship apps. The key finding: <strong>no competitor offers AI-curated appreciation prompts</strong>. The closest is Lasting at $79/yr, which focuses on conflict resolution rather than proactive connection. Full report is ready.
+      <div class="file-chip">
+        <div class="file-icon">MD</div>
+        competitor-analysis.md
+        <div class="file-actions">
+          <span class="file-action">Open</span>
+          <span class="file-action">Reveal</span>
+        </div>
+      </div>
+      <div class="reply-btn" title="Reply to Researcher">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+      </div>
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      <div class="agent-tag" data-focus-agent="analyst">
+        <span class="status-dot working"></span>
+        Analyst
+      </div>
+      Preliminary finding from the cohort analysis: <strong>v4.1 curriculum has 89% 7-day retention but only 4% at 30 days</strong>. The easier prompts keep people engaged short-term but don't create enough value for conversion. v4 had lower initial retention (62%) but 18% at 30 days. This aligns with the "emotional cotton candy" hypothesis.
+      <div class="reply-btn" title="Reply to Analyst">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+      </div>
+    </div>
+
+    <div class="msg user">
+      That confirms it. Let's design a v4.2 curriculum that starts easy then progressively gets harder. Can you also get the blog post about Personal OS finished?
+    </div>
+
+    <div class="routing-indicator">
+      <span class="route-arrow">&rarr;</span> Routing to Designer, Writer
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      On it. <strong>Designer</strong> is building the component library for the new onboarding flow (the curriculum entry point). <strong>Writer</strong> just finished the Personal OS blog post -- 1,800 words covering motivation, architecture, and daily workflow.
+      <div class="file-chip">
+        <div class="file-icon">MD</div>
+        personal-os-post.md
+        <div class="file-actions">
+          <span class="file-action">Open</span>
+          <span class="file-action">Reveal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      <div class="agent-tag" data-focus-agent="code-writer">
+        <span class="status-dot working"></span>
+        Code Writer
+      </div>
+      Auth middleware is about 70% done. JWT validation is working, now implementing refresh token rotation. I've created three files so far. Want me to pull Code Writer forward so you can review inline?
+      <div class="file-chip">
+        <div class="file-icon">TS</div>
+        auth.ts
+        <div class="file-actions">
+          <span class="file-action">Open</span>
+          <span class="file-action">Reveal</span>
+        </div>
+      </div>
+      <div class="file-chip">
+        <div class="file-icon">TS</div>
+        middleware.ts
+        <div class="file-actions">
+          <span class="file-action">Open</span>
+          <span class="file-action">Reveal</span>
+        </div>
+      </div>
+      <div class="file-chip">
+        <div class="file-icon">DT</div>
+        types.d.ts
+        <div class="file-actions">
+          <span class="file-action">Open</span>
+          <span class="file-action">Reveal</span>
+        </div>
+      </div>
+      <div class="reply-btn" title="Reply to Code Writer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+      </div>
+    </div>
+
+    <div class="msg sutra">
+      <div class="sender">Sutra</div>
+      Meanwhile, <strong>Debugger</strong> noticed the WebSocket pool has a memory leak -- event listeners aren't being cleaned up on disconnect. It's investigating. I'll surface findings when ready.
+    </div>
+
+  </div>
+</div>
+
+<!-- Back to Sutra -->
+<div class="back-overlay" id="back-overlay">
+  Back to Sutra <kbd>Esc</kbd>
+</div>
+
+<!-- Input Bar -->
+<div class="input-bar" id="input-bar">
+  <span class="context-label" id="context-label">Sutra</span>
+  <input type="text" id="input" placeholder="Talk to Sutra..." autocomplete="off" spellcheck="false">
+  <button class="send-btn" id="send-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+  </button>
+</div>
+
+<script>
+(function() {
+  // ─── State ───
+  let focusedAgent = null;
+  const agentCards = document.querySelectorAll('.agent-card');
+  const sutraLayer = document.getElementById('sutra-layer');
+  const backOverlay = document.getElementById('back-overlay');
+  const contextLabel = document.getElementById('context-label');
+  const inputEl = document.getElementById('input');
+  const conversation = document.getElementById('conversation');
+
+  // ─── Agent chat histories for focused view ───
+  const agentChats = {
+    'code-writer': [
+      { from: 'agent', text: 'Starting auth middleware implementation. I\'ll use jsonwebtoken for JWT validation and implement refresh token rotation with a sliding window.' },
+      { from: 'agent', text: 'Created auth.ts with token verification. Using RS256 for production and HS256 for dev. Added rate limiting on the refresh endpoint.' },
+      { from: 'user', text: 'Make sure the refresh token is stored httpOnly and add CSRF protection.' },
+      { from: 'agent', text: 'Good call. Updated to use httpOnly secure cookies for refresh tokens. Added CSRF token header validation. Also set SameSite=Strict. Working on the middleware integration now.' },
+      { from: 'agent', text: 'middleware.ts is ready. It chains auth validation, CSRF check, and rate limit. Types exported from types.d.ts. About 70% done -- still need the logout/revocation flow.' },
+    ],
+    'researcher': [
+      { from: 'agent', text: 'Starting competitor landscape analysis for relationship apps. Searching across App Store, Product Hunt, and review aggregators.' },
+      { from: 'agent', text: 'Mapped 14 apps: Lasting, Gottman Card Decks, Paired, Relish, Lovewick, Between, Couple, Happy Couple, Agape, Kindu, Love Nudge, Ours, Hinge (relationship features), Bumble (relationship features).' },
+      { from: 'agent', text: 'Key insight: No competitor offers AI-curated appreciation prompts. Lasting ($79/yr) is closest but focuses on conflict resolution. Paired ($70/yr) has daily questions but no personalization. The appreciation + AI combination is genuinely unique positioning.' },
+      { from: 'agent', text: 'Full report written to competitor-analysis.md. Includes pricing matrix, feature comparison, retention data where public, and strategic recommendations.' },
+    ],
+    'debugger': [
+      { from: 'agent', text: 'Investigating WebSocket memory leak. Taking heap snapshots at 0, 5, and 10 minute intervals under load.' },
+      { from: 'agent', text: 'Found it. In ws-pool.ts line 47: the heartbeat interval is created in on(\'connection\') but never cleared in on(\'close\'). Each disconnected socket retains the interval callback and its closure over the socket object.' },
+      { from: 'agent', text: 'Heap diff confirms: +2.4MB per 100 connections over 10 minutes. The retained objects are all Timeout instances with closures referencing detached WebSocket objects.' },
+      { from: 'user', text: 'Fix it and add a test.' },
+      { from: 'agent', text: 'Working on the fix now. Adding clearInterval in the close handler and a WeakRef-based cleanup for orphaned intervals.' },
+    ],
+    'planner': [
+      { from: 'agent', text: 'Last completed task: Sprint planning for LoveNotes v4.2. Created a 3-week roadmap.' },
+      { from: 'agent', text: 'Week 1: Curriculum v4.2 design + user interview synthesis. Week 2: Implementation + A/B test setup. Week 3: Soft launch to 3 test couples + iterate.' },
+      { from: 'agent', text: 'Ready for next assignment.' },
+    ],
+    'designer': [
+      { from: 'agent', text: 'Building component library for the onboarding flow. Starting with the design token system.' },
+      { from: 'agent', text: 'Token system defined: spacing (4/8/16/24/40), border-radius (6/12/20), colors mapped to semantic roles. Exported as tokens.json for both Figma and code consumption.' },
+      { from: 'agent', text: 'Working on Onboarding.tsx now. Three-step flow: Welcome > Partner Info > Curriculum Preview. Using progressive disclosure to avoid overwhelming new users.' },
+    ],
+    'writer': [
+      { from: 'agent', text: 'Draft complete: "Why I Built a Personal OS." 1,800 words across 5 sections.' },
+      { from: 'agent', text: 'Structure: 1) The problem with lists, 2) Work as a dependency graph, 3) The agent layer, 4) Daily rhythms, 5) What I learned.' },
+      { from: 'agent', text: 'Key line: "Most productivity tools fail because they model work as a list. Real work is a graph of dependencies, energy, and context switches."' },
+      { from: 'agent', text: 'Ready for review. File saved as personal-os-post.md.' },
+    ],
+    'analyst': [
+      { from: 'agent', text: 'Pulling LoveNotes cohort data. Segmenting by signup source, curriculum version, and engagement frequency.' },
+      { from: 'agent', text: 'Preliminary results: v4 cohort (N=4): 62% 7-day retention, 18% 30-day retention. v4.1 cohort (N=7): 89% 7-day retention, 4% 30-day retention.' },
+      { from: 'agent', text: 'The pattern is clear: v4.1 optimized for completion (easier prompts = higher short-term engagement) but destroyed long-term value. Users completed prompts but didn\'t feel transformed. This confirms the "emotional cotton candy" hypothesis.' },
+      { from: 'agent', text: 'Running deeper analysis on prompt-level engagement. Will segment by prompt difficulty score vs. completion rate vs. partner response rate.' },
+    ],
+    'devops': [
+      { from: 'agent', text: 'All systems nominal. Last deployment was 2 hours ago.' },
+      { from: 'agent', text: 'Supabase edge functions: 5/5 deployed. Cron jobs: 5/5 configured. Staging and production environments verified.' },
+      { from: 'agent', text: 'Ready for next task.' },
+    ],
+  };
+
+  const agentDisplayNames = {
+    'code-writer': 'Code Writer',
+    'researcher': 'Researcher',
+    'debugger': 'Debugger',
+    'planner': 'Planner',
+    'designer': 'Designer',
+    'writer': 'Writer',
+    'analyst': 'Analyst',
+    'devops': 'DevOps',
+  };
+
+  // ─── Parallax ───
+  document.addEventListener('mousemove', function(e) {
+    if (focusedAgent) return;
+    const x = (e.clientX / window.innerWidth - 0.5) * 8;
+    const y = (e.clientY / window.innerHeight - 0.5) * 8;
+    document.getElementById('parallax-container').style.transform =
+      `translate(${x}px, ${y}px)`;
+  });
+
+  // ─── Double-click agent to focus ───
+  agentCards.forEach(card => {
+    card.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      focusAgent(card.dataset.agent);
+    });
+  });
+
+  // ─── Agent tags in messages ───
+  document.querySelectorAll('.agent-tag').forEach(tag => {
+    tag.addEventListener('click', function() {
+      const agentId = tag.dataset.focusAgent;
+      if (agentId) focusAgent(agentId);
+    });
+  });
+
+  // ─── Reply buttons ───
+  document.querySelectorAll('.reply-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const msg = btn.closest('.msg');
+      const tag = msg.querySelector('.agent-tag');
+      if (tag && tag.dataset.focusAgent) {
+        focusAgent(tag.dataset.focusAgent);
+      }
+    });
+  });
+
+  // ─── Focus an agent ───
+  function focusAgent(agentId) {
+    if (focusedAgent === agentId) return;
+
+    // Unfocus previous
+    if (focusedAgent) {
+      const prev = document.getElementById('agent-' + focusedAgent);
+      if (prev) {
+        prev.classList.remove('focused');
+        prev.querySelector('.focused-chat')?.remove();
+      }
+    }
+
+    focusedAgent = agentId;
+    const card = document.getElementById('agent-' + agentId);
+    if (!card) return;
+
+    document.body.classList.add('agent-focused');
+
+    // Build focused chat
+    const chatEl = document.createElement('div');
+    chatEl.className = 'focused-chat';
+
+    const msgsEl = document.createElement('div');
+    msgsEl.className = 'focused-messages';
+
+    const history = agentChats[agentId] || [];
+    history.forEach(m => {
+      const msgEl = document.createElement('div');
+      msgEl.className = 'focused-msg ' + (m.from === 'agent' ? 'from-agent' : 'from-user');
+      const sender = document.createElement('div');
+      sender.className = 'f-sender';
+      sender.textContent = m.from === 'agent' ? agentDisplayNames[agentId] : 'You';
+      msgEl.appendChild(sender);
+      const text = document.createElement('div');
+      text.textContent = m.text;
+      msgEl.appendChild(text);
+      msgsEl.appendChild(msgEl);
+    });
+
+    chatEl.appendChild(msgsEl);
+    card.appendChild(chatEl);
+
+    // Force reflow then add class
+    card.offsetHeight;
+    card.classList.add('focused');
+
+    // Update input
+    contextLabel.textContent = agentDisplayNames[agentId];
+    contextLabel.classList.add('agent-context');
+    inputEl.placeholder = 'Talk to ' + agentDisplayNames[agentId] + '...';
+
+    // Scroll chat to bottom
+    setTimeout(() => msgsEl.scrollTop = msgsEl.scrollHeight, 50);
+  }
+
+  // ─── Unfocus ───
+  function unfocusAgent() {
+    if (!focusedAgent) return;
+
+    const card = document.getElementById('agent-' + focusedAgent);
+    if (card) {
+      card.classList.remove('focused');
+      const chatEl = card.querySelector('.focused-chat');
+      if (chatEl) chatEl.remove();
+    }
+
+    focusedAgent = null;
+    document.body.classList.remove('agent-focused');
+    contextLabel.textContent = 'Sutra';
+    contextLabel.classList.remove('agent-context');
+    inputEl.placeholder = 'Talk to Sutra...';
+  }
+
+  // ─── Back overlay click ───
+  backOverlay.addEventListener('click', unfocusAgent);
+
+  // ─── Escape key ───
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') unfocusAgent();
+  });
+
+  // ─── Click dimmed sutra layer to go back ───
+  sutraLayer.addEventListener('click', function(e) {
+    if (document.body.classList.contains('agent-focused')) {
+      unfocusAgent();
+    }
+  });
+
+  // ─── Send message ───
+  function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    if (focusedAgent) {
+      // Send to focused agent chat
+      const card = document.getElementById('agent-' + focusedAgent);
+      const msgsEl = card?.querySelector('.focused-messages');
+      if (msgsEl) {
+        const msgEl = document.createElement('div');
+        msgEl.className = 'focused-msg from-user';
+        const sender = document.createElement('div');
+        sender.className = 'f-sender';
+        sender.textContent = 'You';
+        msgEl.appendChild(sender);
+        const body = document.createElement('div');
+        body.textContent = text;
+        msgEl.appendChild(body);
+        msgsEl.appendChild(msgEl);
+
+        // Store in history
+        if (!agentChats[focusedAgent]) agentChats[focusedAgent] = [];
+        agentChats[focusedAgent].push({ from: 'user', text: text });
+
+        // Simulate reply
+        setTimeout(() => {
+          const replyEl = document.createElement('div');
+          replyEl.className = 'focused-msg from-agent';
+          const rSender = document.createElement('div');
+          rSender.className = 'f-sender';
+          rSender.textContent = agentDisplayNames[focusedAgent];
+          replyEl.appendChild(rSender);
+          const rBody = document.createElement('div');
+          rBody.textContent = 'Acknowledged. Working on that now.';
+          replyEl.appendChild(rBody);
+          msgsEl.appendChild(replyEl);
+          msgsEl.scrollTop = msgsEl.scrollHeight;
+        }, 800);
+
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+    } else {
+      // Send to Sutra conversation
+      const msgEl = document.createElement('div');
+      msgEl.className = 'msg user';
+      msgEl.textContent = text;
+      conversation.appendChild(msgEl);
+
+      // Simulate routing
+      setTimeout(() => {
+        const routeEl = document.createElement('div');
+        routeEl.className = 'routing-indicator';
+        routeEl.innerHTML = '<span class="route-arrow">&rarr;</span> Routing...<div class="routing-dots"><span></span><span></span><span></span></div>';
+        conversation.appendChild(routeEl);
+        conversation.scrollTop = conversation.scrollHeight;
+
+        setTimeout(() => {
+          const replyEl = document.createElement('div');
+          replyEl.className = 'msg sutra';
+          replyEl.innerHTML = '<div class="sender">Sutra</div>I\'ve received your request and am routing it to the appropriate agent. I\'ll surface results as they come in.';
+          conversation.appendChild(replyEl);
+          conversation.scrollTop = conversation.scrollHeight;
+        }, 1200);
+      }, 400);
+
+      conversation.scrollTop = conversation.scrollHeight;
+    }
+
+    inputEl.value = '';
+  }
+
+  document.getElementById('send-btn').addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // ─── Context label click toggles focus ───
+  contextLabel.addEventListener('click', function() {
+    if (focusedAgent) unfocusAgent();
+  });
+
+  // ─── Scroll conversation to bottom on load ───
+  conversation.scrollTop = conversation.scrollHeight;
+
+})();
+</script>
+
+</body>
+</html>

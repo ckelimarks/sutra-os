@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Orbital</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg: #0a0a0e;
+    --surface: #141418;
+    --surface-hover: #1c1c22;
+    --surface-active: #222228;
+    --border: #2a2a30;
+    --border-dim: #1e1e24;
+    --text: #d4d4d8;
+    --text-dim: #71717a;
+    --text-faint: #52525b;
+    --sutra: #a78bfa;
+    --sutra-dim: rgba(167,139,250,0.25);
+    --sutra-glow: rgba(167,139,250,0.08);
+    --agent-lovenotes: #f472b6;
+    --agent-jobsearch: #38bdf8;
+    --agent-teaching: #34d399;
+    --agent-health: #fb923c;
+    --agent-content: #c084fc;
+    --agent-finance: #facc15;
+    --agent-code: #67e8f9;
+    --agent-research: #a3e635;
+    --orbit-line: rgba(255,255,255,0.04);
+    --msg-speed: 0.35s;
+  }
+
+  html { font-size: 15px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+    line-height: 1.55;
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Orbital Section ── */
+  .orbital-section {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    transition: height 0.5s cubic-bezier(0.4,0,0.2,1);
+    flex-shrink: 0;
+  }
+  .orbital-section.expanded { height: 420px; }
+  .orbital-section.collapsed { height: 56px; }
+
+  .orbital-canvas {
+    position: relative;
+    width: 100%;
+    height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .collapsed .orbital-canvas { display: none; }
+
+  /* Collapse strip */
+  .orbital-strip {
+    display: none;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-dim);
+    align-items: center;
+    padding: 0 24px;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .collapsed .orbital-strip { display: flex; }
+
+  .strip-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: 8px;
+  }
+
+  .strip-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .strip-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .strip-dot:hover { transform: scale(1.4); }
+  .strip-dot.pulsing {
+    animation: strip-pulse 2s ease-in-out infinite;
+  }
+  @keyframes strip-pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .strip-expand {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Orbital rings */
+  .orbit-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--orbit-line);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .orbit-ring-1 { width: 160px; height: 160px; }
+  .orbit-ring-2 { width: 280px; height: 280px; }
+  .orbit-ring-3 { width: 400px; height: 400px; }
+  .orbit-ring-4 { width: 540px; height: 540px; }
+
+  /* Sutra center */
+  .sutra-core {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+  }
+  .sutra-core-inner {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--sutra) 0%, rgba(167,139,250,0.3) 70%, transparent 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .sutra-core-inner::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%);
+    animation: core-breathe 3s ease-in-out infinite;
+  }
+  @keyframes core-breathe {
+    0%,100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.3); opacity: 1; }
+  }
+  .sutra-core-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #fff;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Agent nodes */
+  .agent-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .agent-dot {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+  .agent-node:hover .agent-dot {
+    transform: scale(1.15);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .agent-node.selected .agent-dot {
+    border-color: rgba(255,255,255,0.3);
+    transform: scale(1.2);
+  }
+  .agent-dot-icon {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: rgba(0,0,0,0.7);
+    letter-spacing: 0.04em;
+  }
+  .agent-label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px;
+    font-size: 0.62rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .agent-node:hover .agent-label,
+  .agent-node.selected .agent-label { opacity: 1; }
+
+  /* Pulsing active agents */
+  .agent-node.active .agent-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    animation: agent-pulse 2s ease-in-out infinite;
+  }
+  @keyframes agent-pulse {
+    0%,100% { box-shadow: 0 0 0 0 currentColor; opacity: 0.5; }
+    50% { box-shadow: 0 0 12px 4px currentColor; opacity: 0; }
+  }
+
+  /* Dispatch lines (SVG overlay) */
+  .dispatch-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .dispatch-line {
+    stroke-width: 1.5;
+    fill: none;
+    stroke-dasharray: 6 4;
+    animation: dash-flow 1.2s linear infinite;
+  }
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -20; }
+  }
+
+  /* Collapse toggle */
+  .orbital-toggle {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 16px;
+    color: var(--text-faint);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .orbital-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text-dim);
+  }
+  .orbital-toggle svg {
+    width: 12px; height: 12px;
+    transition: transform 0.3s;
+  }
+  .collapsed .orbital-toggle { display: none; }
+
+  /* ── Conversation Feed ── */
+  .feed-section {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 20px 120px;
+  }
+
+  .feed {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* Message blocks */
+  .msg {
+    padding: 14px 18px;
+    border-radius: 12px;
+    position: relative;
+    animation: msg-in var(--msg-speed) ease-out;
+  }
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-user {
+    background: var(--surface);
+    border: 1px solid var(--border-dim);
+    margin-left: 48px;
+  }
+  .msg-user .msg-meta { color: var(--text-faint); }
+
+  .msg-agent {
+    background: transparent;
+    border: 1px solid var(--border-dim);
+  }
+
+  .msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+  }
+  .msg-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .msg-agent-name {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .msg-via {
+    color: var(--text-faint);
+    font-size: 0.62rem;
+  }
+  .msg-time {
+    margin-left: auto;
+    color: var(--text-faint);
+    font-size: 0.62rem;
+  }
+
+  .msg-body {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .msg-body p + p { margin-top: 8px; }
+  .msg-body code {
+    background: rgba(167,139,250,0.1);
+    color: var(--sutra);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .msg-body ul {
+    margin: 6px 0;
+    padding-left: 18px;
+  }
+  .msg-body li {
+    margin: 3px 0;
+    color: var(--text);
+  }
+  .msg-body strong { color: #e4e4e7; }
+
+  /* File chips */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: var(--text);
+    cursor: default;
+  }
+  .file-chip-icon {
+    width: 14px; height: 14px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .file-chip-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--text);
+  }
+  .file-chip-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: 4px;
+  }
+  .file-chip-btn {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    padding: 0;
+  }
+  .file-chip-btn:hover {
+    background: var(--surface-active);
+    color: var(--text);
+  }
+  .file-chip-btn svg { width: 13px; height: 13px; }
+
+  /* Message actions */
+  .msg-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .msg:hover .msg-actions { opacity: 1; }
+
+  .msg-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .msg-action-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-dim);
+    border-color: var(--border);
+  }
+  .msg-action-btn svg { width: 11px; height: 11px; }
+
+  /* Direct chat overlay (inline) */
+  .direct-chat {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 4px;
+    animation: msg-in 0.25s ease-out;
+  }
+  .direct-chat.visible { display: block; }
+
+  .direct-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .direct-chat-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .direct-chat-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .direct-chat-label {
+    font-size: 0.6rem;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--surface-hover);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .direct-chat-close {
+    margin-left: auto;
+    width: 24px; height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .direct-chat-close:hover { background: var(--surface-hover); color: var(--text); }
+  .direct-chat-close svg { width: 14px; height: 14px; }
+
+  .direct-chat-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    resize: none;
+    line-height: 1.4;
+  }
+  .direct-chat-input:focus { border-color: var(--sutra-dim); }
+  .direct-chat-input::placeholder { color: var(--text-faint); }
+
+  /* ── Input Bar ── */
+  .input-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    padding: 16px 20px 24px;
+    background: linear-gradient(transparent, var(--bg) 30%);
+    pointer-events: none;
+  }
+  .input-container {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    gap: 8px;
+    pointer-events: all;
+  }
+  .input-field {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    color: var(--text);
+    font-size: 0.88rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.4;
+  }
+  .input-field:focus { border-color: var(--sutra); }
+  .input-field::placeholder { color: var(--text-faint); }
+
+  .send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: none;
+    background: var(--sutra);
+    color: #0a0a0e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #b89dff; transform: scale(1.05); }
+  .send-btn svg { width: 18px; height: 18px; }
+
+  /* Context target indicator */
+  .input-context {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    border-bottom: none;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    pointer-events: all;
+    position: absolute;
+    top: -30px;
+    left: 0;
+  }
+  .input-context.visible { display: flex; }
+  .input-context-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .input-context-close {
+    margin-left: 4px;
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 2px;
+    line-height: 1;
+  }
+
+  /* Separator */
+  .feed-separator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0 12px;
+  }
+  .feed-separator-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-dim);
+  }
+  .feed-separator-text {
+    font-size: 0.6rem;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 6px 0;
+    font-size: 0.62rem;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-live {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--agent-teaching);
+  }
+
+  /* Tooltip */
+  .tooltip {
+    display: none;
+    position: absolute;
+    z-index: 30;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    pointer-events: none;
+    min-width: 160px;
+  }
+  .tooltip.visible { display: block; }
+  .tooltip-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .tooltip-stat {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    margin: 2px 0;
+  }
+  .tooltip-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+  .tooltip-status.working {
+    background: rgba(167,139,250,0.12);
+    color: var(--sutra);
+  }
+  .tooltip-status.idle {
+    background: rgba(113,113,122,0.12);
+    color: var(--text-dim);
+  }
+
+  /* Scrollbar */
+  .feed-section::-webkit-scrollbar { width: 4px; }
+  .feed-section::-webkit-scrollbar-track { background: transparent; }
+  .feed-section::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Orbital Section ── -->
+<div class="orbital-section expanded" id="orbitalSection">
+
+  <!-- Collapsed strip -->
+  <div class="orbital-strip" onclick="toggleOrbital()">
+    <span class="strip-label">Sutra</span>
+    <div class="strip-dots" id="stripDots"></div>
+    <span class="strip-expand">expand orbital</span>
+  </div>
+
+  <!-- Full orbital view -->
+  <div class="orbital-canvas" id="orbitalCanvas">
+    <!-- Orbit rings -->
+    <div class="orbit-ring orbit-ring-1"></div>
+    <div class="orbit-ring orbit-ring-2"></div>
+    <div class="orbit-ring orbit-ring-3"></div>
+    <div class="orbit-ring orbit-ring-4"></div>
+
+    <!-- Sutra center -->
+    <div class="sutra-core">
+      <div class="sutra-core-inner">
+        <span class="sutra-core-label">S</span>
+      </div>
+    </div>
+
+    <!-- Dispatch lines (SVG) -->
+    <svg class="dispatch-svg" id="dispatchSvg"></svg>
+
+    <!-- Agent nodes injected by JS -->
+
+    <!-- Collapse toggle -->
+    <button class="orbital-toggle" onclick="toggleOrbital()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+      collapse
+    </button>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"></div>
+</div>
+
+<!-- ── Conversation Feed ── -->
+<div class="feed-section" id="feedSection">
+  <div class="feed" id="feed">
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-live"></div>
+        <span>8 agents connected</span>
+      </div>
+      <div class="status-item">
+        <span>$0.47 today</span>
+      </div>
+      <div class="status-item">
+        <span>12 tasks routed</span>
+      </div>
+    </div>
+
+    <!-- Conversation injected by JS -->
+  </div>
+</div>
+
+<!-- ── Input Bar ── -->
+<div class="input-bar">
+  <div class="input-container" style="position:relative;">
+    <div class="input-context" id="inputContext">
+      <div class="input-context-dot" id="inputContextDot"></div>
+      <span id="inputContextLabel">Replying to LoveNotes</span>
+      <button class="input-context-close" onclick="clearInputContext()">&times;</button>
+    </div>
+    <input class="input-field" id="inputField" type="text" placeholder="Talk to Sutra..." autocomplete="off">
+    <button class="send-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- Direct chat overlay (inserted into feed dynamically) -->
+
+<script>
+// ── Agent Data ──
+const AGENTS = [
+  { id:'lovenotes', name:'LoveNotes', color:'#f472b6', initials:'LN', orbit:1, angle:30, size:36, active:true, status:'working', tasks:3, cost:'$0.12', lastActive:'2m ago' },
+  { id:'jobsearch', name:'Job Search', color:'#38bdf8', initials:'JS', orbit:1, angle:160, size:32, active:true, status:'working', tasks:2, cost:'$0.09', lastActive:'5m ago' },
+  { id:'teaching', name:'Teaching', color:'#34d399', initials:'TE', orbit:2, angle:70, size:26, active:false, status:'idle', tasks:0, cost:'$0.03', lastActive:'1h ago' },
+  { id:'health', name:'Health', color:'#fb923c', initials:'HE', orbit:2, angle:210, size:28, active:true, status:'working', tasks:1, cost:'$0.06', lastActive:'8m ago' },
+  { id:'content', name:'Content', color:'#c084fc', initials:'CO', orbit:2, angle:310, size:24, active:false, status:'idle', tasks:0, cost:'$0.02', lastActive:'3h ago' },
+  { id:'finance', name:'Finance', color:'#facc15', initials:'FI', orbit:3, angle:20, size:22, active:false, status:'idle', tasks:0, cost:'$0.01', lastActive:'6h ago' },
+  { id:'code', name:'Code', color:'#67e8f9', initials:'CD', orbit:1, angle:270, size:34, active:true, status:'working', tasks:4, cost:'$0.14', lastActive:'1m ago' },
+  { id:'research', name:'Research', color:'#a3e635', initials:'RE', orbit:3, angle:140, size:20, active:false, status:'idle', tasks:0, cost:'$0.00', lastActive:'1d ago' },
+];
+
+// ── Orbital Rendering ──
+const orbitRadii = { 1: 80, 2: 140, 3: 200, 4: 270 };
+const canvas = document.getElementById('orbitalCanvas');
+const dispatchSvg = document.getElementById('dispatchSvg');
+let selectedAgent = null;
+
+function renderAgents() {
+  // Clear existing nodes
+  canvas.querySelectorAll('.agent-node').forEach(n => n.remove());
+  dispatchSvg.innerHTML = '';
+
+  const cw = canvas.offsetWidth;
+  const ch = canvas.offsetHeight;
+  const cx = cw / 2;
+  const cy = ch / 2;
+
+  AGENTS.forEach(agent => {
+    const r = orbitRadii[agent.orbit];
+    const rad = (agent.angle * Math.PI) / 180;
+    const x = cx + r * Math.cos(rad);
+    const y = cy + r * Math.sin(rad);
+
+    // Create node
+    const node = document.createElement('div');
+    node.className = 'agent-node' + (agent.active ? ' active' : '') + (selectedAgent === agent.id ? ' selected' : '');
+    node.style.left = x + 'px';
+    node.style.top = y + 'px';
+    node.dataset.agentId = agent.id;
+
+    node.innerHTML = `
+      <div class="agent-dot" style="width:${agent.size}px;height:${agent.size}px;background:${agent.color};color:${agent.color};">
+        <span class="agent-dot-icon">${agent.initials}</span>
+      </div>
+      <div class="agent-label">${agent.name}</div>
+    `;
+
+    node.addEventListener('click', () => handleAgentClick(agent));
+    node.addEventListener('mouseenter', (e) => showTooltip(agent, e));
+    node.addEventListener('mouseleave', hideTooltip);
+
+    canvas.appendChild(node);
+
+    // Dispatch lines for active agents
+    if (agent.active) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.classList.add('dispatch-line');
+      line.setAttribute('x1', cx);
+      line.setAttribute('y1', cy);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', y);
+      line.setAttribute('stroke', agent.color);
+      line.setAttribute('opacity', '0.35');
+      dispatchSvg.appendChild(line);
+    }
+  });
+
+  renderStripDots();
+}
+
+function renderStripDots() {
+  const strip = document.getElementById('stripDots');
+  strip.innerHTML = AGENTS.map(a =>
+    `<div class="strip-dot ${a.active ? 'pulsing' : ''}" style="background:${a.color};"></div>`
+  ).join('');
+}
+
+// ── Tooltip ──
+const tooltip = document.getElementById('tooltip');
+function showTooltip(agent, e) {
+  const node = e.currentTarget;
+  const rect = node.getBoundingClientRect();
+  const sectionRect = document.getElementById('orbitalSection').getBoundingClientRect();
+
+  tooltip.innerHTML = `
+    <div class="tooltip-name" style="color:${agent.color}">${agent.name}</div>
+    <div class="tooltip-stat">Tasks: ${agent.tasks} active</div>
+    <div class="tooltip-stat">Cost: ${agent.cost}</div>
+    <div class="tooltip-stat">Last active: ${agent.lastActive}</div>
+    <div class="tooltip-status ${agent.status === 'working' ? 'working' : 'idle'}">
+      ${agent.status === 'working' ? 'Working' : 'Idle'}
+    </div>
+  `;
+
+  tooltip.style.left = (rect.left - sectionRect.left + rect.width / 2 + 16) + 'px';
+  tooltip.style.top = (rect.top - sectionRect.top - 10) + 'px';
+  tooltip.classList.add('visible');
+}
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+// ── Agent Click → Direct Chat ──
+function handleAgentClick(agent) {
+  selectedAgent = selectedAgent === agent.id ? null : agent.id;
+  renderAgents();
+
+  // Remove existing direct chat
+  const existing = document.querySelector('.direct-chat.visible');
+  if (existing) existing.remove();
+
+  if (selectedAgent) {
+    openDirectChat(agent);
+  }
+}
+
+function openDirectChat(agent) {
+  const feed = document.getElementById('feed');
+  const chatEl = document.createElement('div');
+  chatEl.className = 'direct-chat visible';
+  chatEl.innerHTML = `
+    <div class="direct-chat-header">
+      <div class="direct-chat-dot" style="background:${agent.color}"></div>
+      <span class="direct-chat-name">${agent.name}</span>
+      <span class="direct-chat-label">Direct</span>
+      <button class="direct-chat-close" onclick="closeDirectChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <textarea class="direct-chat-input" rows="2" placeholder="Message ${agent.name} directly..."></textarea>
+  `;
+  feed.insertBefore(chatEl, feed.firstChild);
+  chatEl.querySelector('textarea').focus();
+
+  // Scroll to top
+  document.getElementById('feedSection').scrollTop = 0;
+}
+
+function closeDirectChat() {
+  const existing = document.querySelector('.direct-chat.visible');
+  if (existing) existing.remove();
+  selectedAgent = null;
+  renderAgents();
+}
+
+// ── Toggle Orbital ──
+function toggleOrbital() {
+  const section = document.getElementById('orbitalSection');
+  section.classList.toggle('expanded');
+  section.classList.toggle('collapsed');
+}
+
+// ── Input Context (Follow Up) ──
+function setInputContext(agentName, color) {
+  const ctx = document.getElementById('inputContext');
+  const dot = document.getElementById('inputContextDot');
+  const label = document.getElementById('inputContextLabel');
+  ctx.classList.add('visible');
+  dot.style.background = color;
+  label.textContent = 'Replying to ' + agentName;
+  document.getElementById('inputField').focus();
+  document.getElementById('inputField').placeholder = 'Follow up with ' + agentName + '...';
+}
+
+function clearInputContext() {
+  document.getElementById('inputContext').classList.remove('visible');
+  document.getElementById('inputField').placeholder = 'Talk to Sutra...';
+}
+
+// ── SVG Icon Helpers ──
+const icons = {
+  file: '<svg class="file-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  followUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+};
+
+// ── Conversation Data ──
+const conversations = [
+  {
+    type: 'separator',
+    text: 'Earlier today'
+  },
+  {
+    type: 'user',
+    body: 'How are the LoveNotes trial conversions looking? Any patterns in who churns vs stays?',
+    time: '9:12 AM'
+  },
+  {
+    type: 'agent',
+    agent: 'lovenotes',
+    body: `<p>Trial conversion is at <strong>0 of 11</strong> right now. Here's what I'm seeing:</p>
+<ul>
+<li>Completion rates are high (couples finish prompts) but nobody converts to paid</li>
+<li>The v4.1 "pure appreciation" curriculum may be the problem -- therapists called it "emotional cotton candy"</li>
+<li>One user who <em>did</em> show buying signals was on the harder v4 curriculum with action prompts</li>
+<li>Your own usage dropped off -- strongest churn signal possible</li>
+</ul>
+<p>Recommendation: schedule 3 user interviews this week. I've drafted an interview guide based on the Torres OST framework.</p>`,
+    time: '9:12 AM',
+    files: [{ name: 'user-interview-guide.md', path: 'Projects/lovenotes/context/' }]
+  },
+  {
+    type: 'user',
+    body: 'What should I focus on today? Feeling scattered.',
+    time: '10:34 AM'
+  },
+  {
+    type: 'agent',
+    agent: 'sutra',
+    body: `<p>Three things, sequenced by dependency:</p>
+<ul>
+<li><strong>1. Job Search</strong> -- Emmanuel follow-up email is overdue (2 days). 15 min max.</li>
+<li><strong>2. LoveNotes interviews</strong> -- schedule the 3 calls this week. Use the guide that just got drafted.</li>
+<li><strong>3. Health</strong> -- you skipped meds yesterday. Take them now.</li>
+</ul>
+<p>Everything else is P2 or lower. I've already told Teaching and Content agents to stand down today.</p>`,
+    time: '10:34 AM'
+  },
+  {
+    type: 'separator',
+    text: 'Recent'
+  },
+  {
+    type: 'user',
+    body: 'Draft the Emmanuel follow-up. Keep it warm but direct -- reference the system design round.',
+    time: '11:02 AM'
+  },
+  {
+    type: 'agent',
+    agent: 'jobsearch',
+    body: `<p>Done. Here's the draft:</p>
+<p><em>Emmanuel -- great connecting last week. The system design conversation really clicked, especially around the event-driven architecture patterns we discussed. I'd love to continue the conversation whenever you have next steps on your end. Happy to provide any additional context on my background with distributed systems. Best, Christopher</em></p>
+<p>Tone check: warm, references specifics, no desperation. Ready to send or want edits?</p>`,
+    time: '11:02 AM'
+  },
+  {
+    type: 'user',
+    body: 'The Code agent is working on the sutra bridge -- what\'s the status? Also create a sprint plan for this week.',
+    time: '11:30 AM'
+  },
+  {
+    type: 'agent',
+    agent: 'code',
+    body: `<p>Bridge status: <strong>router and rate-limiter are wired</strong>, session-writer integration is next. Currently blocked on a permission check -- I need confirmation before editing <code>bridge.py</code> directly.</p>
+<p>Unblocked items completed:</p>
+<ul>
+<li>Schema validation for Turn dataclass</li>
+<li>Claude CLI adapter tests passing</li>
+<li>Heartbeat format standardized</li>
+</ul>
+<p>I've created the sprint plan with all remaining REQs prioritized.</p>`,
+    time: '11:31 AM',
+    files: [
+      { name: 'sprint-2026-04-w2.md', path: 'Projects/prototypes/sutra/context/plans/' }
+    ]
+  },
+  {
+    type: 'agent',
+    agent: 'health',
+    body: `<p>Quick check-in: your HRV data from the watch shows recovery is <strong>above baseline</strong> today. Good day for focused work. Water intake is low though -- you're at 2 cups by 11 AM, aim for 4 by noon.</p>`,
+    time: '11:45 AM'
+  },
+];
+
+// ── Render Conversation ──
+function renderConversation() {
+  const feed = document.getElementById('feed');
+  const statusBar = feed.querySelector('.status-bar');
+
+  conversations.forEach(msg => {
+    if (msg.type === 'separator') {
+      const sep = document.createElement('div');
+      sep.className = 'feed-separator';
+      sep.innerHTML = `<div class="feed-separator-line"></div><span class="feed-separator-text">${msg.text}</span><div class="feed-separator-line"></div>`;
+      feed.appendChild(sep);
+      return;
+    }
+
+    const el = document.createElement('div');
+
+    if (msg.type === 'user') {
+      el.className = 'msg msg-user';
+      el.innerHTML = `
+        <div class="msg-meta">
+          <span class="msg-time">${msg.time}</span>
+        </div>
+        <div class="msg-body"><p>${msg.body}</p></div>
+      `;
+    } else {
+      const agent = msg.agent === 'sutra'
+        ? { name:'Sutra', color:'#a78bfa', id:'sutra' }
+        : AGENTS.find(a => a.id === msg.agent);
+
+      let filesHtml = '';
+      if (msg.files) {
+        filesHtml = msg.files.map(f => `
+          <div class="file-chip">
+            ${icons.file}
+            <span class="file-chip-name">${f.name}</span>
+            <div class="file-chip-actions">
+              <button class="file-chip-btn" title="Open file">${icons.open}</button>
+              <button class="file-chip-btn" title="Reveal in Finder">${icons.folder}</button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      const viaText = msg.agent === 'sutra' ? '' : `<span class="msg-via">via Sutra</span>`;
+
+      el.className = 'msg msg-agent';
+      el.innerHTML = `
+        <div class="msg-meta">
+          <div class="msg-dot" style="background:${agent.color}"></div>
+          <span class="msg-agent-name" style="color:${agent.color}">${agent.name}</span>
+          ${viaText}
+          <span class="msg-time">${msg.time}</span>
+        </div>
+        <div class="msg-body">${msg.body}</div>
+        ${filesHtml}
+        <div class="msg-actions">
+          <button class="msg-action-btn" onclick="setInputContext('${agent.name}','${agent.color}')">
+            ${icons.followUp}
+            Follow up
+          </button>
+          <button class="msg-action-btn">
+            ${icons.copy}
+            Copy
+          </button>
+        </div>
+      `;
+    }
+
+    feed.appendChild(el);
+  });
+}
+
+// ── Slow orbit drift animation ──
+let driftFrame;
+function driftAgents() {
+  AGENTS.forEach(a => {
+    const speed = a.active ? 0.03 : 0.008;
+    a.angle = (a.angle + speed) % 360;
+  });
+  renderAgents();
+  driftFrame = requestAnimationFrame(driftAgents);
+}
+
+// ── Init ──
+renderAgents();
+renderConversation();
+driftAgents();
+
+// Scroll feed to bottom
+const feedSection = document.getElementById('feedSection');
+setTimeout(() => { feedSection.scrollTop = feedSection.scrollHeight; }, 100);
+</script>
+</body>
+</html>

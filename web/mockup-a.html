@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --surface-2: #18181b;
+    --border: #222225;
+    --text: #e4e4e7;
+    --text-dim: #71717a;
+    --text-faint: #3f3f46;
+    --accent: #a78bfa;
+    --accent-dim: rgba(167, 139, 250, 0.12);
+    --accent-glow: rgba(167, 139, 250, 0.06);
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --radius: 16px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ── Ambient background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 800px 600px at 50% 40%, var(--accent-glow), transparent),
+      radial-gradient(ellipse 400px 300px at 30% 70%, rgba(74, 222, 128, 0.02), transparent),
+      radial-gradient(ellipse 400px 300px at 70% 60%, rgba(96, 165, 250, 0.02), transparent);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.8s ease;
+  }
+
+  /* ── Layout ── */
+  .container {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1;
+  }
+
+  /* ── Conversation area ── */
+  .conversation {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 640px;
+    max-width: 90vw;
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 50vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 100%);
+    padding-top: 80px;
+  }
+
+  .conversation::-webkit-scrollbar { display: none; }
+
+  /* ── Exchange (query + response pair) ── */
+  .exchange {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: fadeInUp 0.5s ease forwards;
+  }
+
+  .exchange.faded {
+    opacity: 0.25;
+    transition: opacity 0.6s ease;
+  }
+
+  .exchange.faded:hover {
+    opacity: 0.7;
+  }
+
+  .exchange.visible {
+    opacity: 1;
+  }
+
+  .query {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 400;
+    padding: 8px 0 4px;
+    letter-spacing: 0.01em;
+  }
+
+  .query::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .response {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 300;
+    padding: 6px 0 16px 14px;
+    border-left: 1px solid var(--border);
+    margin-left: 3px;
+    line-height: 1.7;
+  }
+
+  .response strong {
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .response .label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    animation: shimmer 0.8s ease;
+  }
+
+  .response .label.agent-lovenotes { color: var(--red); background: rgba(248, 113, 113, 0.08); }
+  .response .label.agent-content { color: var(--blue); background: rgba(96, 165, 250, 0.08); }
+  .response .label.agent-continuum { color: var(--accent); background: rgba(167, 139, 250, 0.08); }
+  .response .label.agent-orchestrator { color: var(--text-dim); background: rgba(113, 113, 122, 0.08); }
+
+  .response .metric {
+    display: inline-block;
+    margin-right: 16px;
+    margin-bottom: 4px;
+  }
+
+  .response .metric .val {
+    font-weight: 500;
+    font-size: 15px;
+  }
+
+  .response .metric .unit {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 2px;
+  }
+
+  .response .item {
+    padding: 2px 0;
+    color: var(--text);
+    font-weight: 300;
+  }
+
+  .response .item::before {
+    content: '--';
+    color: var(--text-faint);
+    margin-right: 6px;
+    font-size: 12px;
+  }
+
+  .response .draft-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .response .draft-block .draft-title {
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  .response .note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  /* ── Input bar ── */
+  .input-area {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 640px;
+    max-width: 90vw;
+    z-index: 10;
+    transition: top 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .input-area.pushed-down {
+    top: calc(50% + 20px);
+  }
+
+  .input-wrapper {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .input-wrapper.focused {
+    border-color: rgba(167, 139, 250, 0.3);
+    box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.1), 0 0 40px rgba(167, 139, 250, 0.04);
+  }
+
+  .input-wrapper.processing {
+    border-color: rgba(167, 139, 250, 0.2);
+  }
+
+  .input-wrapper.processing::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scanline 2s ease-in-out infinite;
+  }
+
+  #main-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 400;
+    padding: 16px 20px;
+    letter-spacing: 0.01em;
+  }
+
+  #main-input::placeholder {
+    color: var(--text-faint);
+    font-weight: 300;
+  }
+
+  /* ── Breathing glow on the input ── */
+  .breath-ring {
+    position: absolute;
+    inset: -1px;
+    border-radius: var(--radius);
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(96,165,250,0.1), rgba(167,139,250,0.15));
+    background-size: 200% 200%;
+    transition: opacity 0.4s ease;
+  }
+
+  .input-wrapper.focused .breath-ring {
+    opacity: 1;
+    animation: breathe 4s ease-in-out infinite;
+  }
+
+  /* ── Cost indicator ── */
+  .cost {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    z-index: 5;
+    transition: opacity 0.3s ease;
+  }
+
+  .cost:hover { color: var(--text-dim); }
+
+  /* ── Agent status dots (edge indicators) ── */
+  .agent-dots {
+    position: fixed;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 5;
+  }
+
+  .agent-dot {
+    position: relative;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    transition: all 0.4s ease;
+    cursor: default;
+  }
+
+  .agent-dot.idle { background: var(--text-faint); opacity: 0.4; }
+  .agent-dot.active { opacity: 1; }
+  .agent-dot.active.green { background: var(--green); box-shadow: 0 0 6px rgba(74, 222, 128, 0.4); }
+  .agent-dot.active.purple { background: var(--accent); box-shadow: 0 0 6px rgba(167, 139, 250, 0.4); }
+  .agent-dot.active.blue { background: var(--blue); box-shadow: 0 0 6px rgba(96, 165, 250, 0.4); }
+  .agent-dot.active.red { background: var(--red); box-shadow: 0 0 6px rgba(248, 113, 113, 0.4); }
+  .agent-dot.active.amber { background: var(--amber); box-shadow: 0 0 6px rgba(251, 191, 36, 0.4); }
+
+  .agent-dot .tooltip {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .agent-dot:hover .tooltip { opacity: 1; }
+
+  /* ── Sutra wordmark ── */
+  .wordmark {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    z-index: 5;
+    transition: opacity 0.3s ease;
+  }
+
+  .wordmark:hover { color: var(--text-dim); }
+
+  /* ── Time ── */
+  .clock {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 300;
+    z-index: 5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Thin ambient bar at bottom ── */
+  .ambient-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 10%,
+      var(--accent-dim) 25%,
+      rgba(74, 222, 128, 0.06) 45%,
+      rgba(96, 165, 250, 0.06) 65%,
+      var(--accent-dim) 80%,
+      transparent 90%
+    );
+    z-index: 5;
+    opacity: 0.5;
+  }
+
+  /* ── Routing shimmer overlay ── */
+  .route-flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+  }
+
+  .route-flash.active {
+    animation: routeFlash 0.6s ease forwards;
+  }
+
+  /* ── Typing indicator ── */
+  .typing-indicator {
+    display: none;
+    padding: 6px 0 8px 14px;
+    margin-left: 3px;
+    border-left: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 12px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+  }
+
+  .typing-indicator.visible { display: block; }
+
+  .typing-indicator .dots span {
+    animation: typingDot 1.4s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  .typing-indicator .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ── Animations ── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes breathe {
+    0%, 100% { background-position: 0% 50%; opacity: 0.5; }
+    50% { background-position: 100% 50%; opacity: 1; }
+  }
+
+  @keyframes scanline {
+    0% { width: 0; left: 0; }
+    50% { width: 60%; left: 20%; }
+    100% { width: 0; left: 100%; }
+  }
+
+  @keyframes shimmer {
+    0% { opacity: 0; transform: translateX(-4px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes routeFlash {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes typingDot {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 0.8; }
+  }
+
+  @keyframes pulseOnce {
+    0% { transform: scale(1); }
+    50% { transform: scale(2.5); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .input-area, .conversation { width: 94vw; }
+    .agent-dots { right: 8px; }
+    .cost { right: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Wordmark -->
+<div class="wordmark">sutra</div>
+
+<!-- Clock -->
+<div class="clock" id="clock"></div>
+
+<!-- Agent status dots -->
+<div class="agent-dots">
+  <div class="agent-dot idle" id="dot-orchestrator"><span class="tooltip">orchestrator</span></div>
+  <div class="agent-dot idle" id="dot-lovenotes"><span class="tooltip">lovenotes</span></div>
+  <div class="agent-dot idle" id="dot-content"><span class="tooltip">content</span></div>
+  <div class="agent-dot idle" id="dot-continuum"><span class="tooltip">continuum</span></div>
+  <div class="agent-dot idle" id="dot-geoint"><span class="tooltip">geoint</span></div>
+</div>
+
+<!-- Route flash overlay -->
+<div class="route-flash" id="route-flash"></div>
+
+<!-- Main container -->
+<div class="container">
+
+  <!-- Conversation history -->
+  <div class="conversation" id="conversation"></div>
+
+  <!-- Input -->
+  <div class="input-area" id="input-area">
+    <div class="input-wrapper" id="input-wrapper">
+      <div class="breath-ring"></div>
+      <input type="text" id="main-input" placeholder="ask anything" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="typing-indicator" id="typing-indicator">
+      <span class="dots"><span>.</span><span>.</span><span>.</span></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Cost -->
+<div class="cost" id="cost">$0.00</div>
+
+<!-- Ambient bar -->
+<div class="ambient-bar"></div>
+
+<script>
+// ── Mock data ──
+const mockExchanges = [
+  {
+    query: 'status',
+    agent: 'orchestrator',
+    agentLabel: null,
+    dotId: 'dot-orchestrator',
+    dotColor: 'purple',
+    cost: 0.02,
+    delay: 1800,
+    response: `<div style="margin-bottom: 12px;">
+      <span class="metric"><span class="val" style="color:var(--green)">3</span><span class="unit">agents active</span></span>
+      <span class="metric"><span class="val">12</span><span class="unit">tasks today</span></span>
+      <span class="metric"><span class="val" style="color:var(--amber)">2</span><span class="unit">pending</span></span>
+    </div>
+    <div class="item"><strong>LoveNotes</strong> -- 11 couples, 5 paid. No stale responses. SMS delivery clean.</div>
+    <div class="item"><strong>Job Search</strong> -- Final round with Anthropic Thu. Prep doc current.</div>
+    <div class="item"><strong>Content</strong> -- GEOINT post drafted, needs review. Prototype Hour outline ready.</div>
+    <div class="item"><strong>Teaching</strong> -- Remington grades synced. 315 students, no flags.</div>
+    <div class="note">All systems nominal. Priority: interview prep.</div>`
+  },
+  {
+    query: 'check lovenotes health',
+    agent: 'lovenotes',
+    agentLabel: '<div class="label agent-lovenotes">LoveNotes</div>',
+    dotId: 'dot-lovenotes',
+    dotColor: 'red',
+    cost: 0.04,
+    delay: 2400,
+    response: `<div style="margin-bottom: 12px;">
+      <span class="metric"><span class="val">11</span><span class="unit">couples</span></span>
+      <span class="metric"><span class="val" style="color:var(--green)">5</span><span class="unit">paid</span></span>
+      <span class="metric"><span class="val">0</span><span class="unit">stale</span></span>
+    </div>
+    <div class="item">Last SMS delivery: 14 min ago, all successful</div>
+    <div class="item">Response rate this week: 73% (up from 68%)</div>
+    <div class="item">Partner B invitations pending: 1 (Couple #11, sent 2d ago)</div>
+    <div class="item">Cron jobs: 5/5 healthy, last run 09:00 today</div>
+    <div class="note">No action needed. Consider a nudge for Couple #11's pending invite if no response by tomorrow.</div>`
+  },
+  {
+    query: 'draft a post about GEOINT',
+    agent: 'content',
+    agentLabel: '<div class="label agent-content">ContentWriter</div>',
+    dotId: 'dot-content',
+    dotColor: 'blue',
+    cost: 0.06,
+    delay: 3200,
+    response: `<div class="draft-block">
+      <div class="draft-title">The Intelligence Briefing No One Asked For</div>
+      <p style="margin-top:6px; color:var(--text-dim);">I built a system that reads satellite imagery, cross-references conflict data, and generates daily intelligence briefings.</p>
+      <p style="margin-top:8px;">Not because anyone hired me to. Because I wanted to understand what's actually happening in the world -- beyond headlines, beyond algorithms optimizing for engagement.</p>
+      <p style="margin-top:8px;">Three things I learned building GEOINT tracking as a solo developer:</p>
+      <p style="margin-top:8px;">1. Open-source satellite data is shockingly good now<br/>2. The hard part isn't collection -- it's knowing what matters<br/>3. An AI that reads 400 sources daily still needs a human to ask the right questions</p>
+      <p style="margin-top:8px; color:var(--text-dim);">The prototype runs every morning. It's wrong sometimes. But it's teaching me more about the world than any news feed ever did.</p>
+    </div>
+    <div class="note">280 words. Tone: builder-reflective. Ready for X or LinkedIn -- want me to adjust length or angle?</div>`
+  },
+  {
+    query: 'what did we decide about auth?',
+    agent: 'continuum',
+    agentLabel: '<div class="label agent-continuum">Continuum</div>',
+    dotId: 'dot-continuum',
+    dotColor: 'purple',
+    cost: 0.03,
+    delay: 1600,
+    response: `<div style="margin-bottom: 8px; font-size:12px; color:var(--text-dim);">3 relevant decisions found across Feb-Mar sessions:</div>
+    <div class="item"><strong>Feb 18</strong> -- Supabase auth session persistence fixed. Root cause: Auth.tsx and Onboarding.tsx were not sharing session state. Fixed by lifting auth context.</div>
+    <div class="item"><strong>Feb 18</strong> -- Edge functions (send-welcome-sms, send-invitation) deployed with <span style="color:var(--amber)">--no-verify-jwt</span> as a temporary measure. Marked for re-enabling before production cutover.</div>
+    <div class="item"><strong>Feb 18</strong> -- SignupForm.tsx Turnstile verification bypassed for dev. Must be re-enabled before production.</div>
+    <div class="note">Two auth-related items are flagged for production readiness. Want me to surface the full cutover checklist?</div>`
+  }
+];
+
+// ── State ──
+let currentExchange = 0;
+let totalCost = 0;
+let isProcessing = false;
+
+const input = document.getElementById('main-input');
+const inputWrapper = document.getElementById('input-wrapper');
+const inputArea = document.getElementById('input-area');
+const conversation = document.getElementById('conversation');
+const costEl = document.getElementById('cost');
+const typingIndicator = document.getElementById('typing-indicator');
+const routeFlash = document.getElementById('route-flash');
+const clock = document.getElementById('clock');
+
+// ── Clock ──
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  clock.textContent = h + ':' + m;
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ── Input focus ──
+input.addEventListener('focus', () => inputWrapper.classList.add('focused'));
+input.addEventListener('blur', () => inputWrapper.classList.remove('focused'));
+
+// Focus on any keypress
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    input.blur();
+    return;
+  }
+  if (document.activeElement !== input && !e.metaKey && !e.ctrlKey && e.key.length === 1) {
+    input.focus();
+  }
+});
+
+// ── Submit ──
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !isProcessing) {
+    const val = input.value.trim();
+    if (!val) return;
+    processQuery(val);
+  }
+});
+
+function processQuery(queryText) {
+  if (currentExchange >= mockExchanges.length) {
+    // Loop back
+    currentExchange = 0;
+  }
+
+  isProcessing = true;
+  const mock = mockExchanges[currentExchange];
+  input.value = '';
+
+  // Fade older exchanges
+  const existing = conversation.querySelectorAll('.exchange');
+  existing.forEach(el => {
+    el.classList.remove('visible');
+    el.classList.add('faded');
+  });
+
+  // Add query
+  const exchangeEl = document.createElement('div');
+  exchangeEl.className = 'exchange visible';
+
+  const queryEl = document.createElement('div');
+  queryEl.className = 'query';
+  queryEl.textContent = queryText;
+  exchangeEl.appendChild(queryEl);
+
+  conversation.appendChild(exchangeEl);
+  conversation.scrollTop = conversation.scrollHeight;
+
+  // Push input area down slightly
+  inputArea.classList.add('pushed-down');
+
+  // Show typing + processing state
+  inputWrapper.classList.add('processing');
+  typingIndicator.classList.add('visible');
+
+  // Activate agent dot
+  activateDot(mock.dotId, mock.dotColor);
+
+  // Route flash
+  if (mock.agentLabel) {
+    triggerRouteFlash(mock.dotColor);
+  }
+
+  // Simulate response
+  setTimeout(() => {
+    inputWrapper.classList.remove('processing');
+    typingIndicator.classList.remove('visible');
+
+    const responseEl = document.createElement('div');
+    responseEl.className = 'response';
+    responseEl.innerHTML = (mock.agentLabel || '') + mock.response;
+    exchangeEl.appendChild(responseEl);
+
+    // Update cost
+    totalCost += mock.cost;
+    costEl.textContent = '$' + totalCost.toFixed(2);
+
+    // Deactivate dot after a beat
+    setTimeout(() => deactivateDot(mock.dotId), 1500);
+
+    conversation.scrollTop = conversation.scrollHeight;
+
+    isProcessing = false;
+    currentExchange++;
+  }, mock.delay);
+}
+
+function activateDot(id, color) {
+  const dot = document.getElementById(id);
+  dot.classList.remove('idle');
+  dot.classList.add('active', color);
+  dot.style.animation = 'pulseOnce 0.5s ease';
+  setTimeout(() => dot.style.animation = '', 500);
+}
+
+function deactivateDot(id) {
+  const dot = document.getElementById(id);
+  dot.classList.remove('active', 'green', 'purple', 'blue', 'red', 'amber');
+  dot.classList.add('idle');
+}
+
+function triggerRouteFlash(color) {
+  const colors = {
+    red: 'rgba(248, 113, 113, 0.03)',
+    blue: 'rgba(96, 165, 250, 0.03)',
+    purple: 'rgba(167, 139, 250, 0.03)',
+    green: 'rgba(74, 222, 128, 0.03)',
+    amber: 'rgba(251, 191, 36, 0.03)',
+  };
+  routeFlash.style.background = `radial-gradient(ellipse at center, ${colors[color] || colors.purple}, transparent 70%)`;
+  routeFlash.classList.remove('active');
+  void routeFlash.offsetWidth; // reflow
+  routeFlash.classList.add('active');
+  setTimeout(() => routeFlash.classList.remove('active'), 700);
+}
+
+// ── Auto-focus on load ──
+setTimeout(() => input.focus(), 200);
+
+// ── Auto-demo: run first exchange after brief pause ──
+setTimeout(() => {
+  input.value = 'status';
+  setTimeout(() => processQuery('status'), 400);
+}, 1200);
+</script>
+
+</body>
+</html>

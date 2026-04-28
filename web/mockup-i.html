@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Pulse</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080808;
+    --fg: #e8e8e8;
+    --fg-dim: #666;
+    --fg-dimmer: #333;
+    --accent: #888;
+    --amber: #d4a017;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --blue: #3498db;
+    --transition: 300ms ease-out;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- EDGE PULSE RINGS ---- */
+  #pulse-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ---- RESPONSE AREA ---- */
+  #response-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 40px 80px 20px;
+    position: relative;
+    z-index: 2;
+    scrollbar-width: none;
+  }
+  #response-area::-webkit-scrollbar { display: none; }
+
+  .response-item {
+    transition: opacity var(--transition), transform var(--transition);
+    margin-bottom: 40px;
+    min-height: 0;
+    background: var(--bg);
+    position: relative;
+    z-index: 1;
+  }
+  .response-item.past-2 { opacity: 0.3; pointer-events: none; }
+  .response-item.past-1 { opacity: 0.6; }
+  .response-item.current { opacity: 1; z-index: 2; }
+
+  .response-query {
+    font-size: 13px;
+    color: var(--fg-dim);
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  .response-attribution {
+    height: 2px;
+    border-radius: 1px;
+    margin-bottom: 20px;
+    transition: background var(--transition);
+    width: 60px;
+  }
+
+  .response-body {
+    font-size: 15px;
+    line-height: 1.7;
+    max-width: 800px;
+    color: var(--fg);
+  }
+  .response-body h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 24px 0 12px;
+    letter-spacing: -0.3px;
+  }
+  .response-body h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 20px 0 8px;
+    color: var(--fg);
+  }
+  .response-body p { margin: 8px 0; }
+  .response-body ul { list-style: none; padding-left: 0; }
+  .response-body li { padding: 4px 0; }
+  .response-body li::before { content: ""; }
+
+  .response-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--fg-dimmer);
+  }
+
+  .agent-link {
+    cursor: pointer;
+    transition: color var(--transition);
+  }
+  .agent-link:hover { color: var(--fg-dim); }
+
+  .cost-footnote {
+    transition: color var(--transition);
+  }
+  .cost-footnote.amber { color: var(--amber); }
+
+  /* ---- FILE CHIPS ---- */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid #222;
+    border-radius: 6px;
+    margin: 6px 8px 6px 0;
+    font-size: 12px;
+    background: #0e0e0e;
+    transition: border-color var(--transition);
+  }
+  .file-chip:hover { border-color: #444; }
+  .file-chip-action {
+    color: var(--fg-dim);
+    cursor: pointer;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .file-chip-action:hover { color: var(--fg); }
+
+  /* ---- APPROVAL BUTTONS ---- */
+  .approval-actions {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+  }
+  .approval-btn {
+    font-family: inherit;
+    font-size: 13px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 0;
+    letter-spacing: 0.5px;
+    transition: color var(--transition);
+  }
+  .approval-btn.approve { color: var(--green); }
+  .approval-btn.approve:hover { color: #5dde98; }
+  .approval-btn.reject { color: var(--fg-dimmer); }
+  .approval-btn.reject:hover { color: var(--red); }
+
+  /* ---- STATUS GRID ---- */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid #111;
+    font-size: 13px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.active { background: var(--green); }
+  .status-dot.idle { background: var(--fg-dimmer); }
+  .status-dot.busy { background: var(--amber); }
+  .status-name { width: 120px; font-weight: 500; }
+  .status-detail { flex: 1; color: var(--fg-dim); }
+  .status-cost { width: 60px; text-align: right; color: var(--fg-dimmer); font-size: 11px; }
+
+  /* ---- AGENT OVERVIEW GRID ---- */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+  }
+  .agent-card {
+    padding: 20px;
+    border: 1px solid #151515;
+    border-radius: 8px;
+    transition: border-color var(--transition);
+  }
+  .agent-card:hover { border-color: #333; }
+  .agent-card-name { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+  .agent-card-detail { font-size: 11px; color: var(--fg-dim); margin: 3px 0; }
+
+  /* ---- EXPANDABLE REPORT ---- */
+  .report-summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .report-expand {
+    font-size: 11px;
+    color: var(--fg-dimmer);
+    transition: color var(--transition);
+  }
+  .report-expand:hover { color: var(--fg-dim); }
+  .report-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 400ms ease-out, opacity var(--transition);
+    opacity: 0;
+  }
+  .report-detail.open {
+    max-height: 600px;
+    opacity: 1;
+  }
+  .report-full {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 400ms ease-out, opacity var(--transition);
+    opacity: 0;
+    margin-top: 12px;
+  }
+  .report-full.open {
+    max-height: 1000px;
+    opacity: 1;
+  }
+
+  /* ---- MEMORY ATTRIBUTION ---- */
+  .memory-source {
+    font-size: 11px;
+    color: var(--fg-dimmer);
+    padding: 8px 0;
+    border-left: 2px solid #222;
+    padding-left: 12px;
+    margin-top: 16px;
+  }
+
+  /* ---- LOCAL BADGE ---- */
+  .local-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--fg-dimmer);
+    border: 1px solid #1a1a1a;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* ---- INPUT AREA ---- */
+  #input-area {
+    padding: 16px 80px 24px;
+    position: relative;
+    z-index: 3;
+    border-top: 1px solid #111;
+  }
+  #input-prefix {
+    font-size: 14px;
+    color: var(--fg-dim);
+    margin-right: 4px;
+    display: none;
+  }
+  #input-wrapper {
+    display: flex;
+    align-items: center;
+  }
+  #main-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 14px;
+    caret-color: var(--fg);
+    letter-spacing: 0.2px;
+  }
+  #main-input::placeholder { color: #2a2a2a; }
+
+  #hint-bar {
+    font-size: 10px;
+    color: #1e1e1e;
+    margin-top: 8px;
+    display: flex;
+    gap: 20px;
+    transition: color var(--transition);
+  }
+  #hint-bar span { transition: color var(--transition); }
+  #hint-bar:hover span { color: var(--fg-dimmer); }
+
+  .kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid #222;
+    border-radius: 3px;
+    font-size: 9px;
+    margin: 0 2px;
+    vertical-align: 1px;
+  }
+
+  /* ---- TRANSITIONS ---- */
+  .fade-in {
+    animation: fadeIn 300ms ease-out forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .typing-dots::after {
+    content: '';
+    animation: dots 1.2s infinite;
+  }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+</style>
+</head>
+<body>
+
+<svg id="pulse-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+
+<div id="response-area"></div>
+
+<div id="input-area">
+  <div id="input-wrapper">
+    <span id="input-prefix"></span>
+    <input type="text" id="main-input" placeholder="ask sutra anything..." autofocus autocomplete="off" spellcheck="false">
+  </div>
+  <div id="hint-bar">
+    <span><span class="kbd">Enter</span> send</span>
+    <span><span class="kbd">Tab</span> agents</span>
+    <span><span class="kbd">/</span> commands</span>
+    <span><span class="kbd">Esc</span> dismiss</span>
+    <span>type a question or press Enter to cycle demos</span>
+  </div>
+</div>
+
+<script>
+// ---- AGENT REGISTRY ----
+const AGENTS = {
+  lovenotes:  { name: 'LoveNotes',    color: '#e07baa', model: 'claude-sonnet-4-20250514', status: 'idle' },
+  jobsearch:  { name: 'JobSearch',    color: '#5b8def', model: 'claude-sonnet-4-20250514', status: 'idle' },
+  remington:  { name: 'Remington',    color: '#f0a04b', model: 'claude-haiku-4-20250414', status: 'idle' },
+  writer:     { name: 'Writer',       color: '#8b5cf6', model: 'claude-opus-4-20250514', status: 'idle' },
+  researcher: { name: 'Researcher',   color: '#06b6d4', model: 'claude-sonnet-4-20250514', status: 'idle' },
+  coder:      { name: 'Coder',        color: '#22c55e', model: 'claude-sonnet-4-20250514', status: 'idle' },
+  memory:     { name: 'Memory',       color: '#a78bfa', model: 'qwen2.5:7b', status: 'idle' },
+  planner:    { name: 'Planner',      color: '#f472b6', model: 'claude-haiku-4-20250414', status: 'idle' },
+  health:     { name: 'HealthCheck',  color: '#34d399', model: 'claude-haiku-4-20250414', status: 'idle' },
+  local:      { name: 'Local',        color: '#94a3b8', model: 'qwen2.5:7b', status: 'idle' },
+};
+
+// ---- PULSE SYSTEM ----
+const pulseCanvas = document.getElementById('pulse-canvas');
+let pulseRings = [];
+let animFrame;
+
+function createPulseRing(agentKey, edge) {
+  const agent = AGENTS[agentKey];
+  const ring = { agentKey, color: agent.color, edge, phase: 0, speed: 0.008 + Math.random() * 0.005 };
+  pulseRings.push(ring);
+  return ring;
+}
+
+function clearPulses() {
+  pulseRings = [];
+  pulseCanvas.innerHTML = '';
+}
+
+function renderPulses() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  let svg = '';
+
+  pulseRings.forEach(ring => {
+    ring.phase += ring.speed;
+    if (ring.phase > 1) ring.phase -= 1;
+
+    const alpha = Math.sin(ring.phase * Math.PI) * 0.3;
+    const offset = ring.phase * 60;
+
+    if (ring.edge === 'left') {
+      svg += `<ellipse cx="${-20 + offset}" cy="${h/2}" rx="${30 + offset}" ry="${h * 0.4}" fill="none" stroke="${ring.color}" stroke-width="1" opacity="${alpha}"/>`;
+    } else if (ring.edge === 'right') {
+      svg += `<ellipse cx="${w + 20 - offset}" cy="${h/2}" rx="${30 + offset}" ry="${h * 0.4}" fill="none" stroke="${ring.color}" stroke-width="1" opacity="${alpha}"/>`;
+    } else if (ring.edge === 'top') {
+      svg += `<ellipse cx="${w/2}" cy="${-20 + offset}" rx="${w * 0.4}" ry="${30 + offset}" fill="none" stroke="${ring.color}" stroke-width="1" opacity="${alpha}"/>`;
+    } else if (ring.edge === 'bottom') {
+      svg += `<ellipse cx="${w/2}" cy="${h + 20 - offset}" rx="${w * 0.4}" ry="${30 + offset}" fill="none" stroke="${ring.color}" stroke-width="1" opacity="${alpha}"/>`;
+    }
+  });
+
+  pulseCanvas.innerHTML = svg;
+  animFrame = requestAnimationFrame(renderPulses);
+}
+
+renderPulses();
+
+function activateAgent(key, edge) {
+  AGENTS[key].status = 'busy';
+  createPulseRing(key, edge || 'left');
+  createPulseRing(key, edge === 'left' ? 'right' : (edge || 'right'));
+}
+
+function deactivateAgent(key) {
+  AGENTS[key].status = 'idle';
+  pulseRings = pulseRings.filter(r => r.agentKey !== key);
+}
+
+function deactivateAll() {
+  Object.keys(AGENTS).forEach(k => AGENTS[k].status = 'idle');
+  clearPulses();
+}
+
+// ---- RESPONSE MANAGER ----
+const responseArea = document.getElementById('response-area');
+let responseHistory = [];
+let currentScenario = -1;
+let directAgent = null;
+let showingAgentGrid = false;
+
+function pushResponse(html, query, agentKey, cost, model, options = {}) {
+  // Clear all existing items — one thought at a time
+  const items = [...responseArea.querySelectorAll('.response-item')];
+  items.forEach((item, i) => {
+    item.classList.remove('current', 'past-1', 'past-2');
+    if (i === items.length - 1) {
+      item.classList.add('past-1');
+    } else if (i === items.length - 2) {
+      item.classList.add('past-2');
+    } else {
+      // Remove anything older than 2 items
+      item.style.transition = 'opacity 300ms ease-out';
+      item.style.opacity = '0';
+      setTimeout(() => item.remove(), 300);
+    }
+  });
+
+  const agent = agentKey ? AGENTS[agentKey] : null;
+  const el = document.createElement('div');
+  el.className = 'response-item current fade-in';
+
+  let footerLeft = '';
+  if (agent) {
+    footerLeft = `Handled by <span class="agent-link" data-agent="${agentKey}">${agent.name}</span>`;
+  }
+
+  let footerRight = '';
+  if (cost !== undefined && model) {
+    const amberClass = options.budgetAlert ? ' amber' : '';
+    footerRight = `<span class="cost-footnote${amberClass}">${model} / ${cost}</span>`;
+  }
+
+  const attrColor = agent ? agent.color : 'transparent';
+
+  el.innerHTML = `
+    ${query ? `<div class="response-query">${query}</div>` : ''}
+    <div class="response-attribution" style="background: ${attrColor};"></div>
+    <div class="response-body">${html}</div>
+    <div class="response-footer">
+      <div>${footerLeft}</div>
+      <div>${footerRight}</div>
+    </div>
+  `;
+
+  responseArea.appendChild(el);
+  responseArea.scrollTop = responseArea.scrollHeight;
+
+  // agent link click handler
+  const agentLink = el.querySelector('.agent-link');
+  if (agentLink) {
+    agentLink.addEventListener('click', () => {
+      const ak = agentLink.dataset.agent;
+      enterDirectMode(ak);
+    });
+  }
+
+  // report expand handlers
+  el.querySelectorAll('.report-summary').forEach(summary => {
+    summary.addEventListener('click', () => {
+      const detail = summary.nextElementSibling;
+      if (detail) detail.classList.toggle('open');
+    });
+  });
+  el.querySelectorAll('.report-detail .report-summary').forEach(summary => {
+    summary.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const full = summary.nextElementSibling;
+      if (full) full.classList.toggle('open');
+    });
+  });
+
+  // approval handlers
+  el.querySelectorAll('.approval-btn.approve').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.approval-actions').innerHTML = '<span style="color: var(--green); font-size: 12px;">Approved. Executing...</span>';
+      activateAgent('coder', 'top');
+      setTimeout(() => deactivateAgent('coder'), 2000);
+    });
+  });
+  el.querySelectorAll('.approval-btn.reject').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.approval-actions').innerHTML = '<span style="color: var(--fg-dimmer); font-size: 12px;">Rejected.</span>';
+    });
+  });
+
+  responseHistory.push({ html, query, agentKey, cost, model });
+}
+
+function enterDirectMode(agentKey) {
+  directAgent = agentKey;
+  const agent = AGENTS[agentKey];
+  const prefix = document.getElementById('input-prefix');
+  prefix.style.display = 'inline';
+  prefix.textContent = `@${agent.name} > `;
+  prefix.style.color = agent.color;
+  mainInput.placeholder = `message ${agent.name} directly...`;
+}
+
+function exitDirectMode() {
+  directAgent = null;
+  const prefix = document.getElementById('input-prefix');
+  prefix.style.display = 'none';
+  mainInput.placeholder = 'ask sutra anything...';
+}
+
+// ---- SCENARIOS ----
+const scenarios = [
+  // 1. Natural language dispatch: lovenotes health
+  () => {
+    deactivateAll();
+    activateAgent('lovenotes', 'left');
+    activateAgent('health', 'right');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <h2>LoveNotes Health Report</h2>
+        <p style="color: var(--fg-dim); font-size: 13px; margin-bottom: 20px;">11 couples enrolled / 5 paid / 6 trial</p>
+
+        <h3>Delivery Status</h3>
+        <p>All SMS queues nominal. 0 failed deliveries in last 24h.</p>
+        <p>Last cron run: 08:00 UTC today -- 22 messages sent.</p>
+
+        <h3>Engagement</h3>
+        <p>Response rate (7d rolling): <strong>68%</strong> (up from 61% last week)</p>
+        <p>Stale couples (no response 72h+): <strong>2</strong> -- Marcus & Tia, Devon & Priya</p>
+
+        <h3>Revenue</h3>
+        <p>MRR: <strong>$45.00</strong> / 5 paid couples at $9/mo</p>
+        <p>Trial conversion rate: <strong>0/6</strong> -- unchanged</p>
+        <p>Churn risk: Low (all paid couples active in last 48h)</p>
+
+        <h3>Infrastructure</h3>
+        <p>Supabase: healthy / Twilio: healthy / Stripe: healthy</p>
+        <p>Edge function cold starts: avg 340ms (acceptable)</p>
+      `, 'check lovenotes health', 'lovenotes', '$0.003', 'haiku');
+    }, 1500);
+  },
+
+  // 2. Status synthesis
+  () => {
+    deactivateAll();
+    activateAgent('planner', 'top');
+    setTimeout(() => {
+      deactivateAll();
+      const rows = [
+        { key: 'lovenotes', last: 'Health check completed', cost: '$0.003', status: 'active' },
+        { key: 'jobsearch', last: 'Prepped HG R2 questions', cost: '$0.041', status: 'idle' },
+        { key: 'remington', last: 'Graded batch 12 essays', cost: '$0.008', status: 'idle' },
+        { key: 'writer', last: 'Drafted Prototype Hour post', cost: '$0.062', status: 'idle' },
+        { key: 'researcher', last: 'Competitor analysis (Honeydue)', cost: '$0.023', status: 'idle' },
+        { key: 'coder', last: 'Fixed auth session bug', cost: '$0.031', status: 'idle' },
+        { key: 'memory', last: 'Indexed 3 session transcripts', cost: '$0.000', status: 'active' },
+        { key: 'planner', last: 'Generated this status', cost: '$0.002', status: 'busy' },
+      ];
+
+      let html = '<h2>Agent Status</h2><div style="margin-top: 16px;">';
+      rows.forEach(r => {
+        const a = AGENTS[r.key];
+        const dotClass = r.status === 'active' ? 'active' : (r.status === 'busy' ? 'busy' : 'idle');
+        html += `
+          <div class="status-row">
+            <div class="status-dot ${dotClass}" style="background: ${dotClass === 'idle' ? '' : a.color};"></div>
+            <div class="status-name" style="color: ${a.color};">${a.name}</div>
+            <div class="status-detail">${r.last}</div>
+            <div class="status-cost">${r.cost}</div>
+          </div>`;
+      });
+      html += '</div><p style="font-size: 12px; color: var(--fg-dimmer); margin-top: 16px;">Session total: $0.170 / $5.00 daily budget</p>';
+
+      pushResponse(html, 'status', 'planner', '$0.002', 'haiku');
+    }, 800);
+  },
+
+  // 3. Cost-aware routing (simple question -> haiku)
+  () => {
+    deactivateAll();
+    activateAgent('planner', 'bottom');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <p>Christopher has 11 couples on LoveNotes. 5 are paid subscribers at $9/month, and 6 are on free trials. The product launched in early February 2026.</p>
+      `, 'how many couples are on lovenotes?', 'planner', '$0.001', 'haiku');
+    }, 500);
+  },
+
+  // 4. File creation
+  () => {
+    deactivateAll();
+    activateAgent('writer', 'left');
+    activateAgent('coder', 'right');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <p>Created the interview prep materials for your HG R2.</p>
+
+        <div style="margin: 20px 0;">
+          <div class="file-chip">
+            <span style="color: var(--fg-dim);">hg-r2-prep.md</span>
+            <span class="file-chip-action">open</span>
+            <span class="file-chip-action">reveal</span>
+          </div>
+          <div class="file-chip">
+            <span style="color: var(--fg-dim);">hg-questions-bank.md</span>
+            <span class="file-chip-action">open</span>
+            <span class="file-chip-action">reveal</span>
+          </div>
+          <div class="file-chip">
+            <span style="color: var(--fg-dim);">hg-company-research.md</span>
+            <span class="file-chip-action">open</span>
+            <span class="file-chip-action">reveal</span>
+          </div>
+        </div>
+
+        <p style="color: var(--fg-dim); font-size: 13px;">3 files written to Projects/job-search/prep/</p>
+      `, 'prep my HG round 2 interview', 'writer', '$0.058', 'opus');
+    }, 2000);
+  },
+
+  // 5. Supervised approval
+  () => {
+    deactivateAll();
+    activateAgent('coder', 'top');
+    setTimeout(() => {
+      deactivateAgent('coder');
+      pushResponse(`
+        <h3>Pending Approval</h3>
+        <p style="margin: 16px 0; color: var(--fg-dim);">LoveNotes edge function <code style="color: var(--fg); background: #151515; padding: 2px 6px; border-radius: 3px;">send-welcome-sms</code> needs JWT verification re-enabled for production.</p>
+
+        <p style="font-size: 13px; margin-bottom: 8px;">This will modify:</p>
+        <div class="file-chip">
+          <span style="color: var(--fg-dim);">supabase/functions/send-welcome-sms/index.ts</span>
+        </div>
+
+        <p style="font-size: 13px; color: var(--fg-dim); margin-top: 12px;">Change: Remove <code style="background: #151515; padding: 2px 6px; border-radius: 3px;">--no-verify-jwt</code> flag from deployment config. New signups will require authenticated requests.</p>
+
+        <div class="approval-actions">
+          <button class="approval-btn approve">Approve</button>
+          <button class="approval-btn reject">Reject</button>
+        </div>
+      `, 'deploy lovenotes to production', 'coder', '$0.012', 'sonnet');
+    }, 1200);
+  },
+
+  // 6. Direct agent reply
+  () => {
+    deactivateAll();
+    activateAgent('researcher', 'right');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <p>Honeydue has ~50K MAU, focused on shared finances for couples. Their engagement model is transaction-based -- users open the app when a purchase is made.</p>
+
+        <p style="margin-top: 12px;">Key differences from LoveNotes:</p>
+        <ul>
+          <li>-- Honeydue is reactive (triggered by financial events)</li>
+          <li>-- LoveNotes is proactive (scheduled appreciation prompts)</li>
+          <li>-- No direct competitor does SMS-first couple communication</li>
+          <li>-- Closest: Paired app (daily questions) but app-based, not SMS</li>
+        </ul>
+
+        <p style="margin-top: 12px; color: var(--fg-dim); font-size: 13px;">Click "Researcher" below to ask follow-up questions directly.</p>
+      `, 'what does honeydue do differently?', 'researcher', '$0.019', 'sonnet');
+    }, 1400);
+  },
+
+  // 7. Agent overview (Tab key)
+  () => {
+    deactivateAll();
+    // Clear all previous responses for clean grid view
+    responseArea.querySelectorAll('.response-item').forEach(el => el.remove());
+    let html = '<h2>Agents</h2><div class="agent-grid">';
+    Object.entries(AGENTS).forEach(([key, agent]) => {
+      const statusColor = agent.status === 'busy' ? 'var(--amber)' : (agent.status === 'active' ? 'var(--green)' : 'var(--fg-dimmer)');
+      html += `
+        <div class="agent-card">
+          <div class="agent-card-name" style="color: ${agent.color};">${agent.name}</div>
+          <div class="agent-card-detail">Model: ${agent.model}</div>
+          <div class="agent-card-detail">Status: <span style="color: ${statusColor};">${agent.status}</span></div>
+          <div class="agent-card-detail">Lifetime cost: $${(Math.random() * 0.5).toFixed(3)}</div>
+        </div>`;
+    });
+    html += '</div><p style="font-size: 11px; color: var(--fg-dimmer); margin-top: 12px;">Press Escape or type to return to conversation.</p>';
+    pushResponse(html, 'Tab  /  Agent Overview', null);
+    showingAgentGrid = true;
+  },
+
+  // 8. Memory retrieval
+  () => {
+    deactivateAll();
+    showingAgentGrid = false;
+    activateAgent('memory', 'left');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <p>You decided to test a harder curriculum (v4.2) after the February product depth debate.</p>
+
+        <p style="margin-top: 12px;">The core finding was that the pure appreciation curriculum (v4.1) optimized for completion but destroyed perceived value. Therapists called it "emotional cotton candy."</p>
+
+        <p style="margin-top: 12px;">Key decisions made:</p>
+        <ul>
+          <li>-- Reintroduce action prompts and stretch prompts</li>
+          <li>-- Run user interviews before shipping v4.2</li>
+          <li>-- The one user who converted was on the harder v4 track</li>
+          <li>-- Your own experience: you didn't miss the prompts when you stopped</li>
+        </ul>
+
+        <div class="memory-source">
+          Retrieved from February 15, 2026 session<br>
+          Source: product-depth-debate-2026-02-15.md
+        </div>
+      `, 'what did we decide about onboarding?', 'memory', '$0.000', 'qwen2.5:7b (local)');
+    }, 1000);
+  },
+
+  // 9. Report zoom (expandable)
+  () => {
+    deactivateAll();
+    activateAgent('researcher', 'bottom');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <div>
+          <div class="report-summary">
+            <p>LoveNotes trial conversion remains at 0/6. Three hypotheses identified for testing.</p>
+            <span class="report-expand">[+]</span>
+          </div>
+          <div class="report-detail">
+            <div style="margin-top: 16px;">
+              <p><strong>Hypothesis 1: Curriculum too soft</strong></p>
+              <p style="color: var(--fg-dim);">v4.1 appreciation-only prompts feel low-stakes. Users complete but don't perceive enough value to pay.</p>
+
+              <p style="margin-top: 12px;"><strong>Hypothesis 2: No aha moment</strong></p>
+              <p style="color: var(--fg-dim);">Trial period ends before couples experience a meaningful shift in communication patterns.</p>
+
+              <div class="report-summary" style="margin-top: 16px;">
+                <p><strong>Hypothesis 3: Wrong audience</strong></p>
+                <span class="report-expand">[+]</span>
+              </div>
+              <div class="report-full">
+                <p style="color: var(--fg-dim); margin-top: 8px;">Current trial users may be "curious browsers" rather than couples with genuine communication pain points. The product resonates most with couples who have experienced conflict and are actively seeking tools -- not those who think "this might be fun." Consider targeting couples therapy alumni or relationship coaching clients as a more motivated segment.</p>
+                <p style="color: var(--fg-dim); margin-top: 8px;">Evidence: The one paying couple (Marcus & Tia) came from a therapy referral. All trial couples came from organic social posts.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `, 'why aren\'t trials converting?', 'researcher', '$0.024', 'sonnet');
+    }, 1600);
+  },
+
+  // 10. Budget alert
+  () => {
+    deactivateAll();
+    // activate multiple agents to show amber pulse
+    activateAgent('writer', 'left');
+    activateAgent('coder', 'right');
+    activateAgent('researcher', 'top');
+
+    // shift pulse colors to amber
+    setTimeout(() => {
+      pulseRings.forEach(r => r.color = '#d4a017');
+    }, 500);
+
+    setTimeout(() => {
+      pushResponse(`
+        <p>Session spend has reached <strong style="color: var(--amber);">$4.23 of $5.00</strong> daily budget.</p>
+
+        <p style="margin-top: 12px; color: var(--fg-dim);">Remaining capacity at current rate: approximately 12 more Haiku calls or 2 Opus calls.</p>
+
+        <p style="margin-top: 12px;">Routing has shifted to prefer local models and Haiku for non-critical queries. Opus will only be used if you explicitly request deep analysis.</p>
+
+        <p style="margin-top: 16px; font-size: 13px; color: var(--fg-dimmer);">To adjust: "set budget to $10" or "pause spending"</p>
+      `, 'continue research on competitor landscape', 'planner', '$0.002', 'haiku', { budgetAlert: true });
+    }, 1200);
+  },
+
+  // 11. Ollama routing (local)
+  () => {
+    deactivateAll();
+    activateAgent('local', 'bottom');
+    setTimeout(() => {
+      deactivateAll();
+      pushResponse(`
+        <p>Your next P0 tasks from TASKS.md:</p>
+
+        <p style="margin-top: 16px;"><strong>1.</strong> Run user interviews for LoveNotes v4.2 curriculum</p>
+        <p style="color: var(--fg-dim); margin-left: 20px; font-size: 13px;">Blocked: need to schedule with 3 trial couples</p>
+
+        <p style="margin-top: 10px;"><strong>2.</strong> HG R2 interview prep</p>
+        <p style="color: var(--fg-dim); margin-left: 20px; font-size: 13px;">Files ready in job-search/prep/</p>
+
+        <p style="margin-top: 10px;"><strong>3.</strong> Ship Prototype Hour episode on agent orchestration</p>
+        <p style="color: var(--fg-dim); margin-left: 20px; font-size: 13px;">Draft complete, needs recording</p>
+
+        <div style="margin-top: 20px;">
+          <span class="local-badge">
+            <span style="display: inline-block; width: 5px; height: 5px; background: var(--green); border-radius: 50%;"></span>
+            processed locally -- no API cost
+          </span>
+        </div>
+      `, 'what should I work on today?', 'local', '$0.00', 'qwen2.5:7b (local)');
+    }, 600);
+  },
+];
+
+// ---- INPUT HANDLING ----
+const mainInput = document.getElementById('main-input');
+
+const scenarioTriggers = [
+  'check lovenotes health',
+  'status',
+  'how many couples are on lovenotes?',
+  'prep my HG round 2 interview',
+  'deploy lovenotes to production',
+  'what does honeydue do differently?',
+  null, // tab trigger
+  'what did we decide about onboarding?',
+  'why aren\'t trials converting?',
+  'continue research on competitor landscape',
+  'what should I work on today?',
+];
+
+mainInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (!showingAgentGrid) {
+      scenarios[6](); // agent overview
+    }
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    showingAgentGrid = false;
+    exitDirectMode();
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = mainInput.value.trim();
+    mainInput.value = '';
+
+    // if in direct mode, exit on empty
+    if (directAgent && !val) {
+      exitDirectMode();
+      return;
+    }
+
+    // cycle through scenarios
+    currentScenario = (currentScenario + 1) % scenarios.length;
+    if (currentScenario === 6) currentScenario++; // skip tab scenario in cycle
+
+    // update input to show what was "typed"
+    if (scenarioTriggers[currentScenario] && !val) {
+      // auto-cycle
+    }
+
+    showingAgentGrid = false;
+    scenarios[currentScenario]();
+  }
+});
+
+// ---- INITIAL HINT STATE ----
+// Show a subtle welcome
+setTimeout(() => {
+  pushResponse(`
+    <p style="color: var(--fg-dimmer); font-size: 14px;">Ready.</p>
+    <p style="color: #1a1a1a; font-size: 12px; margin-top: 8px;">Press Enter to begin demo, or type a question.</p>
+  `, null, null);
+}, 300);
+
+// ---- WINDOW RESIZE ----
+window.addEventListener('resize', () => {
+  // pulse canvas auto-resizes via CSS
+});
+</script>
+</body>
+</html>

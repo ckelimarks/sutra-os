@@ -245,8 +245,8 @@ class TestMangleCwd(unittest.TestCase):
     def test_real_path(self):
         """Matches the actual mangled directory name on this machine."""
         self.assertEqual(
-            ProcessManager._mangle_cwd("$SUTRA_PROJECT_ROOT"),
-            "-Users-foo-bar-baz"
+            ProcessManager._mangle_cwd("/Users/christopherk.marks/Downloads/personal-os-main"),
+            "-Users-christopherk-marks-Downloads-personal-os-main"
         )
 
 

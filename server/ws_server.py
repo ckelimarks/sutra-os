@@ -44,7 +44,7 @@ _global_terminal = {
     'clients': set(),
 }
 
-PERSONAL_OS_ROOT = "$SUTRA_PROJECT_ROOT"
+PERSONAL_OS_ROOT = "/Users/christopherk.marks/Downloads/personal-os-main"
 
 def spawn_global_terminal():
     """Spawn a zsh PTY for the global terminal using subprocess + pty pair."""

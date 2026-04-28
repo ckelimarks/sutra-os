@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   Synthesis (16). Concept: "Desk" — a single dispatch bar up top, four horizontal lanes
-  for the four life areas (CPA / HG / Content / Life), and a continuous right-to-left
+  for the four life areas (LoveNotes / HG / Content / Life), and a continuous right-to-left
   time flow. Drew from: Squad's decisive commit gesture, Command's real named life-areas,
   Timeline's moving playhead, Bases' growth (completed work accretes as small nodes on the
   right of each lane), Hangar's arc-in-flight (dispatched agent arcs into its lane).
@@ -246,7 +246,7 @@ html, body {
   overflow: hidden;
 }
 .lane:last-child { border-bottom: none; }
-.lane[data-id="cpa"] { background: linear-gradient(180deg, var(--ln-tint) 0%, var(--paper) 100%); }
+.lane[data-id="lovenotes"] { background: linear-gradient(180deg, var(--ln-tint) 0%, var(--paper) 100%); }
 .lane[data-id="hg"]        { background: linear-gradient(180deg, var(--hg-tint) 0%, var(--paper) 100%); }
 .lane[data-id="content"]   { background: linear-gradient(180deg, var(--content-tint) 0%, var(--paper) 100%); }
 .lane[data-id="life"]      { background: linear-gradient(180deg, var(--life-tint) 0%, var(--paper) 100%); }
@@ -538,7 +538,7 @@ html, body {
              placeholder="Type an idea — then Enter…"
              autocomplete="off" spellcheck="false" />
       <div class="lane-pick" id="lanePick">
-        <button data-lane="cpa">CPA</button>
+        <button data-lane="lovenotes">LoveNotes</button>
         <button data-lane="hg">HG</button>
         <button data-lane="content">Content</button>
         <button data-lane="life">Life</button>
@@ -573,10 +573,10 @@ html, body {
   <!-- STAGE -->
   <div class="stage" id="stage">
     <div class="lanes" id="lanes">
-      <div class="lane" data-id="cpa">
+      <div class="lane" data-id="lovenotes">
         <div class="lane-head">
-          <span class="name">CPA</span>
-          <span class="meta mono" data-count-for="cpa">0 active</span>
+          <span class="name">LoveNotes</span>
+          <span class="meta mono" data-count-for="lovenotes">0 active</span>
         </div>
         <div class="ticks"></div>
         <div class="growth"><svg viewBox="0 0 220 200" preserveAspectRatio="none"><g class="edges"></g><g class="nodes"></g></svg></div>
@@ -629,7 +629,7 @@ html, body {
    ============================================================ */
 
 const LANES = [
-  { id: 'cpa', name: 'CPA' },
+  { id: 'lovenotes', name: 'LoveNotes' },
   { id: 'hg',        name: 'HG' },
   { id: 'content',   name: 'Content' },
   { id: 'life',      name: 'Life' },
@@ -637,11 +637,11 @@ const LANES = [
 
 // Agents — small pool, each has initials + optional specialty (informs default lane)
 const AGENTS = [
-  { id: 'A1', name: 'AR', spec: 'cpa' },
+  { id: 'A1', name: 'AR', spec: 'lovenotes' },
   { id: 'A2', name: 'BK', spec: 'hg' },
   { id: 'A3', name: 'CV', spec: 'content' },
   { id: 'A4', name: 'DL', spec: 'life' },
-  { id: 'A5', name: 'EM', spec: 'cpa' },
+  { id: 'A5', name: 'EM', spec: 'lovenotes' },
   { id: 'A6', name: 'FP', spec: 'content' },
   { id: 'A7', name: 'GN', spec: null },
   { id: 'A8', name: 'HS', spec: null },
@@ -650,7 +650,7 @@ const AGENTS = [
 // Simulation state
 const state = {
   tasks: [],         // active tasks
-  selectedLane: 'cpa',
+  selectedLane: 'lovenotes',
   now: Date.now(),
   // horizontal scaling: each second = PX_PER_SEC; tasks drift leftward from playhead
   // visible window: LOOKBACK_MS old (behind playhead) + LOOKAHEAD_MS upcoming (ahead, to right)
@@ -661,10 +661,10 @@ const LOOKAHEAD_MS = 40 * 1000;   // a bit of planned runway
 
 // Seed tasks — realistic, per lane. Some already running, some queued (future), some done (past).
 const SEED_TASKS = [
-  // CPA
-  { lane:'cpa', label:'Review PR #482 — reminder scheduler refactor', agent:'A1', startOffset:-22000, dur: 55000, progress: 0.40 },
-  { lane:'cpa', label:'Draft reply to Sarah re: contract redlines',    agent:'A5', startOffset:-8000,  dur: 28000, progress: 0.28, needsInput:true },
-  { lane:'cpa', label:'Triage Supabase auth errors (last 24h)',        agent:null, startOffset:12000,  dur: 35000, progress: 0 },
+  // LoveNotes
+  { lane:'lovenotes', label:'Review PR #482 — reminder scheduler refactor', agent:'A1', startOffset:-22000, dur: 55000, progress: 0.40 },
+  { lane:'lovenotes', label:'Draft reply to Sarah re: contract redlines',    agent:'A5', startOffset:-8000,  dur: 28000, progress: 0.28, needsInput:true },
+  { lane:'lovenotes', label:'Triage Supabase auth errors (last 24h)',        agent:null, startOffset:12000,  dur: 35000, progress: 0 },
   // HG
   { lane:'hg', label:'Summarize client intake call — action items', agent:'A2', startOffset:-30000, dur: 40000, progress: 0.75 },
   { lane:'hg', label:'Draft Q2 OKRs — coaching program',            agent:null, startOffset:8000,   dur: 50000, progress: 0 },
@@ -678,7 +678,7 @@ const SEED_TASKS = [
 
 // Completed tasks to seed the growth graph immediately
 const SEED_DONE = {
-  cpa: 6,
+  lovenotes: 6,
   hg: 3,
   content: 8,
   life: 4,
@@ -722,7 +722,7 @@ lanePickEl.addEventListener('click', (e) => {
   setLane(btn.dataset.lane);
   taskInput.focus();
 });
-setLane('cpa');
+setLane('lovenotes');
 
 /* ---------- Input: idea → dispatch ---------- */
 taskInput.addEventListener('keydown', (e) => {
@@ -741,7 +741,7 @@ taskInput.addEventListener('keydown', (e) => {
 /* auto-classify light-weight: keywords → default lane suggestion */
 taskInput.addEventListener('input', () => {
   const v = taskInput.value.toLowerCase();
-  if (/\b(pr|supabase|sms|reminder|twilio|auth|love\s*notes|cpa)\b/.test(v)) setLane('cpa');
+  if (/\b(pr|supabase|sms|reminder|twilio|auth|love\s*notes|lovenotes)\b/.test(v)) setLane('lovenotes');
   else if (/\b(hg|client|coaching|intake|okr|session)\b/.test(v)) setLane('hg');
   else if (/\b(essay|post|substack|draft|outline|article|newsletter)\b/.test(v)) setLane('content');
   else if (/\b(dentist|appt|bill|grocery|receipt|life|household|book\s)\b/.test(v)) setLane('life');
@@ -1121,10 +1121,10 @@ function simTick() {
 
   // Occasionally the user "auto-dispatches" a new task (simulate activity)
   if (Math.random() < 0.05) {
-    const lanes = ['cpa','hg','content','life'];
+    const lanes = ['lovenotes','hg','content','life'];
     const laneId = lanes[Math.floor(Math.random() * lanes.length)];
     const phr = {
-      cpa: ['patch Twilio rate limit bug','write release notes v0.9','reply to beta user #12','audit reminder queue'],
+      lovenotes: ['patch Twilio rate limit bug','write release notes v0.9','reply to beta user #12','audit reminder queue'],
       hg:        ['prep next client session','draft check-in email','review coaching recording','update client roadmap'],
       content:   ['outline next post','pull quotes from book','schedule Substack','draft tweet thread'],
       life:      ['renew car registration','reply to mom','pay internet bill','plan weekend']
@@ -1173,10 +1173,10 @@ requestAnimationFrame(tick);
 // Simulation tick every 2s
 setInterval(simTick, 2000);
 
-// Periodic graph growth for CPA/Content (show "still being thought about")
+// Periodic graph growth for LoveNotes/Content (show "still being thought about")
 setInterval(() => {
   const roll = Math.random();
-  if (roll < 0.4) addGrowthNode('cpa');
+  if (roll < 0.4) addGrowthNode('lovenotes');
   else if (roll < 0.7) addGrowthNode('content');
   else if (roll < 0.85) addGrowthNode('hg');
   else addGrowthNode('life');

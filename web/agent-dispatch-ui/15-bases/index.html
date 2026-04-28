@@ -23,7 +23,7 @@
     --accent-glow: rgba(245,183,61,0.55);
     --danger: #ef5a5a;
     --ok: #6fe1b1;
-    --cpa: 320;  /* hue for each base aura */
+    --lovenotes: 320;  /* hue for each base aura */
     --hg: 190;
     --content: 50;
     --life: 150;
@@ -592,7 +592,7 @@
     Command
   </button>
   <span class="sep">·</span>
-  <span class="focus-name mono" id="focusName">CPA</span>
+  <span class="focus-name mono" id="focusName">LOVENOTES</span>
   <span class="sep">·</span>
   <span class="task-now" id="focusTask">awaiting dispatch</span>
 </div>
@@ -609,7 +609,7 @@
         <feGaussianBlur stdDeviation="4" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
-      <radialGradient id="baseAura-cpa" cx="50%" cy="50%" r="50%">
+      <radialGradient id="baseAura-lovenotes" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="hsla(320,65%,55%,0.16)"/>
         <stop offset="55%" stop-color="hsla(320,45%,40%,0.05)"/>
         <stop offset="100%" stop-color="hsla(320,30%,20%,0)"/>
@@ -648,7 +648,7 @@
       <span class="dispatch-prefix">&gt;</span>
       <input id="dispatchInput" type="text" placeholder="review PR #482 for auth flow…" autocomplete="off" />
       <select id="dispatchBase">
-        <option value="cpa">CPA</option>
+        <option value="lovenotes">LoveNotes</option>
         <option value="hg">HG</option>
         <option value="content">Content</option>
         <option value="life">Life</option>
@@ -702,7 +702,7 @@
 
 // ---------------- DATA MODEL ----------------
 const BASES = [
-  { id: 'cpa', name: 'CPA', hue: 320, x: 0.26, y: 0.36, radius: 180 },
+  { id: 'lovenotes', name: 'LoveNotes', hue: 320, x: 0.26, y: 0.36, radius: 180 },
   { id: 'hg',        name: 'HG',        hue: 190, x: 0.74, y: 0.34, radius: 165 },
   { id: 'content',   name: 'Content',   hue: 50,  x: 0.30, y: 0.72, radius: 170 },
   { id: 'life',      name: 'Life',      hue: 150, x: 0.72, y: 0.72, radius: 155 },
@@ -710,7 +710,7 @@ const BASES = [
 
 // Seed nodes. Each gets project, label, kind, and a brief description.
 const SEED_NODES = {
-  cpa: [
+  lovenotes: [
     ['README.md', 'doc', 'Product overview — AI SMS for couples'],
     ['schema.sql', 'code', 'Supabase table definitions for pairs & messages'],
     ['sms-webhook.ts', 'code', 'Twilio inbound handler'],
@@ -763,7 +763,7 @@ const SEED_NODES = {
 
 // Possible task phrasings per base — used for dispatch sim + new-node labels
 const TASK_TEMPLATES = {
-  cpa: [
+  lovenotes: [
     'review PR #482 auth flow', 'draft q2 retention experiment', 'tune prompt for conflict mode',
     'profile slow webhook', 'A/B pricing copy', 'audit rate-limit middleware',
     'write post-mortem for outage', 'design weekly digest screen'
@@ -784,7 +784,7 @@ const TASK_TEMPLATES = {
 };
 
 const NODE_LABEL_TEMPLATES = {
-  cpa: ['auth-middleware.ts', 'retention-v2.md', 'prompt-conflict.md', 'rate-audit.md', 'pricing-ab.md', 'outage-notes.md', 'webhook-profile.json', 'tone-calibration.ts'],
+  lovenotes: ['auth-middleware.ts', 'retention-v2.md', 'prompt-conflict.md', 'rate-audit.md', 'pricing-ab.md', 'outage-notes.md', 'webhook-profile.json', 'tone-calibration.ts'],
   hg: ['q2-okrs.md', 'intake-v3.tsx', 'adherence-analysis.md', 'referral-brief.md', 'case-study-m.md', 'engagement-plan.md'],
   content: ['essay-dispatch.md', 'newsletter-014.md', 'guest-post-ideas.md', 'thread-q1-top.md', 'post-personal-os.md'],
   life: ['dentist-booking.md', 'vendor-shortlist.md', 'finance-q1.md', 'anniversary-plan.md', 'birthday-list-v2.md'],
@@ -799,7 +799,7 @@ const state = {
   agents: [],     // {id, name, base, x, y, targetNode, prevNode, phase, phaseT, task, status, selected}
   bases: {},      // id -> {...BASES[i], cx, cy, radius, nodeIds[]}
   queues: {       // per base
-    cpa: [], hg: [], content: [], life: [],
+    lovenotes: [], hg: [], content: [], life: [],
   },
   mode: 'command',  // 'command' | 'observe'
   focusBase: null,
@@ -898,8 +898,8 @@ function buildSeedGraph() {
 // ---------------- AGENT SEEDING ----------------
 function seedAgents() {
   const initial = [
-    { base: 'cpa', status: 'working', task: 'tune prompt for conflict mode' },
-    { base: 'cpa', status: 'working', task: 'audit rate-limit middleware' },
+    { base: 'lovenotes', status: 'working', task: 'tune prompt for conflict mode' },
+    { base: 'lovenotes', status: 'working', task: 'audit rate-limit middleware' },
     { base: 'hg',        status: 'alert',   task: 'draft Q2 OKRs for coaching' },
     { base: 'content',   status: 'working', task: 'draft essay on agent dispatch' },
     { base: 'life',      status: 'idle',    task: null },
@@ -927,7 +927,7 @@ function seedAgents() {
   });
 
   // Seed queues
-  state.queues.cpa = [
+  state.queues.lovenotes = [
     { task: 'review PR #482 auth flow', priority: 'P1' },
     { task: 'write post-mortem for outage', priority: 'P2' },
   ];

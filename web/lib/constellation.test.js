@@ -14,18 +14,18 @@ import {
 
 describe('constellation.js — Key Derivation', () => {
   it('hashStr produces consistent results', () => {
-    const h1 = hashStr('cpa');
-    const h2 = hashStr('cpa');
+    const h1 = hashStr('lovenotes');
+    const h2 = hashStr('lovenotes');
     expect(h1).toBe(h2);
   });
 
   it('projectKey extracts from cwd', () => {
     // parts[2] of Projects/prototypes/scratch/... is 'scratch'
-    const cwd = '$SUTRA_PROJECT_ROOT/Projects/prototypes/scratch/scratchpad';
+    const cwd = '/Users/christopherk.marks/Downloads/personal-os-main/Projects/prototypes/scratch/scratchpad';
     expect(projectKey(cwd, 'worker')).toBe('scratch');
     // top-level project
-    const cwd2 = '$SUTRA_PROJECT_ROOT/Projects/cpa';
-    expect(projectKey(cwd2, 'worker')).toBe('cpa');
+    const cwd2 = '/Users/christopherk.marks/Downloads/personal-os-main/Projects/lovenotes';
+    expect(projectKey(cwd2, 'worker')).toBe('lovenotes');
   });
 
   it('projectKey returns sutra for orchestrator', () => {
@@ -33,7 +33,7 @@ describe('constellation.js — Key Derivation', () => {
   });
 
   it('projectLabel titlecases keys', () => {
-    expect(projectLabel('cpa')).toBe('Cpa');
+    expect(projectLabel('lovenotes')).toBe('Lovenotes');
     expect(projectLabel('AI_research')).toBe('AI Research'); // all-caps words preserved
     expect(projectLabel('agent-dispatch')).toBe('Agent Dispatch');
   });
@@ -45,8 +45,8 @@ describe('constellation.js — Form Selection', () => {
   });
 
   it('pickForm returns deterministic form per key', () => {
-    const f1 = pickForm('cpa', 3, false);
-    const f2 = pickForm('cpa', 3, false);
+    const f1 = pickForm('lovenotes', 3, false);
+    const f2 = pickForm('lovenotes', 3, false);
     expect(f1).toBe(f2);
   });
 
@@ -95,7 +95,7 @@ describe('constellation.js — Geometry', () => {
 
 describe('constellation.js — Layout', () => {
   it('layoutProjects places sutra at origin', () => {
-    const keys = ['sutra', 'cpa'];
+    const keys = ['sutra', 'lovenotes'];
     const result = layoutProjects(keys);
     expect(result.sutra.wx).toBe(0);
     expect(result.sutra.wy).toBe(0);

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Beam</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #020a12;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+  }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; cursor: pointer; z-index: 10;
+    transition: opacity 0.8s ease;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay p {
+    color: rgba(180, 240, 255, 0.5);
+    font-size: 12px; letter-spacing: 0.35em; text-transform: uppercase;
+  }
+  #overlay .ring {
+    width: 44px; height: 44px;
+    border: 1px solid rgba(180, 240, 255, 0.25);
+    border-radius: 50%;
+    animation: breathe 2.5s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.25; }
+    50%       { transform: scale(1.15); opacity: 0.6; }
+  }
+
+  /* ── Chat bar ── */
+  #chat-bar {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(680px, calc(100vw - 48px));
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(4, 14, 26, 0.72);
+    border: 1px solid rgba(100, 200, 255, 0.12);
+    border-radius: 40px;
+    backdrop-filter: blur(12px);
+    padding: 10px 10px 10px 22px;
+    z-index: 20;
+    box-shadow: 0 0 40px rgba(0, 100, 200, 0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  #chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: rgba(200, 235, 255, 0.85);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    caret-color: rgba(140, 220, 255, 0.8);
+  }
+  #chat-input::placeholder { color: rgba(120, 180, 220, 0.3); }
+  #send-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(100, 200, 255, 0.25);
+    background: rgba(20, 60, 100, 0.5);
+    color: rgba(160, 225, 255, 0.7);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    flex-shrink: 0;
+    padding-left: 2px; /* optical center for triangle */
+  }
+  #send-btn:hover {
+    background: rgba(40, 100, 180, 0.6);
+    border-color: rgba(140, 220, 255, 0.5);
+    color: rgba(220, 245, 255, 1);
+  }
+
+  #error {
+    position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+    color: rgba(180, 240, 255, 0.3);
+    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; display: none;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="overlay">
+  <div class="ring"></div>
+  <p>click to begin</p>
+</div>
+
+<div id="chat-bar">
+  <input id="chat-input" type="text" placeholder="Message Sutra..." autocomplete="off" />
+  <button id="send-btn">&#9654;</button>
+</div>
+
+<div id="error">microphone unavailable — ambient mode</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const overlay   = document.getElementById('overlay');
+const errorEl   = document.getElementById('error');
+const chatInput = document.getElementById('chat-input');
+const sendBtn   = document.getElementById('send-btn');
+
+let W, H, cx;
+let analyser = null, dataArray = null;
+let amplitude = 0;
+const HALF_ANGLE = 28 * Math.PI / 180;
+let breathPhase = 0;
+let time = 0;
+
+// Mouse
+let mouseX = -1000, mouseY = -1000;
+let hoveredAgent = null;
+
+// ── Agent data ─────────────────────────────────────────────────────────────
+const AGENTS = [
+  {
+    id: 'orchestrator',
+    name: 'Orchestrator',
+    task: 'Routing tasks, monitoring sub-agents',
+    tokens: 8240, maxTokens: 32000,
+    status: 'active',  // active | working | idle
+    side: 'left',  vFrac: 0.28, xFrac: 0.10,
+    dotted: false,
+  },
+  {
+    id: 'coder',
+    name: 'Code Agent',
+    task: 'Refactoring auth middleware — 3 files',
+    tokens: 24100, maxTokens: 32000,
+    status: 'working',
+    side: 'left',  vFrac: 0.52, xFrac: 0.08,
+    dotted: false,
+  },
+  {
+    id: 'researcher',
+    name: 'Research Agent',
+    task: 'Idle — awaiting next task',
+    tokens: 5600, maxTokens: 32000,
+    status: 'idle',
+    side: 'right', vFrac: 0.22, xFrac: 0.90,
+    dotted: true,
+  },
+  {
+    id: 'writer',
+    name: 'Writer Agent',
+    task: 'Drafting PRD for voice feature',
+    tokens: 18900, maxTokens: 32000,
+    status: 'working',
+    side: 'right', vFrac: 0.46, xFrac: 0.88,
+    dotted: false,
+  },
+];
+
+// Per-agent pulse phases
+AGENTS.forEach((a, i) => { a._phase = i * 1.3; });
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+canvas.addEventListener('mouseleave', () => { mouseX = -1000; mouseY = -1000; });
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function coneHW(y)      { return Math.max(0, (H - y) * Math.tan(HALF_ANGLE)); }
+
+// ── Computed agent positions ───────────────────────────────────────────────
+function agentPos(agent) {
+  const y      = agent.vFrac * H;
+  const hw     = coneHW(y);
+  const sign   = agent.side === 'left' ? -1 : 1;
+  const coneX  = cx + sign * hw;
+  const nodeX  = agent.xFrac * W;
+  return { nodeX, nodeY: y, coneX, coneY: y };
+}
+
+// ── Particles ──────────────────────────────────────────────────────────────
+const MAX_P = 700;
+const particles = [];
+
+class Particle {
+  constructor(staggered) {
+    this.dead = true;
+    this._init(staggered || false);
+  }
+  _init(staggered) {
+    this.dead      = false;
+    this.lifespan  = 260 + Math.random() * 300;
+    this.age       = staggered ? Math.random() * this.lifespan : 0;
+    const r        = Math.random();
+    this.y         = H - r * r * H;
+    const hw       = coneHW(this.y) * 0.88;
+    this.x         = cx + (Math.random() * 2 - 1) * hw;
+    this.phase     = Math.random() * Math.PI * 2;
+    this.phase2    = Math.random() * Math.PI * 2;
+    this.phaseSpd  = 0.004 + Math.random() * 0.007;
+    this.phaseSpd2 = 0.003 + Math.random() * 0.005;
+    this.driftX    = (Math.random() - 0.5) * 0.18;
+    this.driftY    = -(0.04 + Math.random() * 0.12);
+    this.radius    = 0.25 + Math.random() * 0.75;
+  }
+  reset() { this._init(false); }
+  update() {
+    this.age++;
+    if (this.age >= this.lifespan) { this.dead = true; return; }
+    this.phase  += this.phaseSpd;
+    this.phase2 += this.phaseSpd2;
+    const turb   = amplitude * 2.2;
+    this.x      += this.driftX + Math.sin(this.phase)  * (0.15 + turb * 0.6);
+    this.y      += this.driftY + Math.cos(this.phase2) * (0.08 + turb * 0.25);
+    const hw     = coneHW(this.y) * 1.05;
+    if (Math.abs(this.x - cx) > hw || this.y < -20 || this.y > H + 5) {
+      this.dead = true; return;
+    }
+    const normY  = this.y / H;
+    const posO   = 0.15 + normY * 0.75;
+    const t      = this.age / this.lifespan;
+    const lifeO  = t < 0.08 ? t / 0.08 : t > 0.82 ? (1 - t) / 0.18 : 1;
+    this.opacity = Math.min(1, posO * lifeO * (0.55 + amplitude * 0.35));
+  }
+  draw() {
+    const normY = this.y / H;
+    const hue   = 195 + (1 - normY) * 10;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue}, 55%, 92%, ${this.opacity})`;
+    ctx.fill();
+  }
+}
+for (let i = 0; i < MAX_P; i++) particles.push(new Particle(true));
+function getFreeParticle() { for (const p of particles) if (p.dead) return p; return null; }
+
+// ── Audio ──────────────────────────────────────────────────────────────────
+function readAudio() {
+  if (!analyser) return;
+  analyser.getByteFrequencyData(dataArray);
+  let sum = 0;
+  for (let i = 0; i < 48; i++) sum += dataArray[i];
+  const raw = Math.min(1, (sum / 48) / 110);
+  amplitude = lerp(amplitude, raw, 0.18);
+}
+
+// ── Cone (gradient only, no clip) ──────────────────────────────────────────
+function drawCone() {
+  const breath = Math.sin(breathPhase) * 0.5 + 0.5;
+  // When mic active: amplitude drives everything. When not: breathe gently.
+  const pulse       = analyser ? amplitude : breath * 0.18;
+  const baseOpacity = 0.10 + pulse * 0.38;
+  const topHW       = H * Math.tan(HALF_ANGLE);
+  // Radius expands with voice — the cone "blooms" when speaking
+  const maxR        = (Math.sqrt(H * H + topHW * topHW) * 1.05) * (0.75 + pulse * 0.4);
+
+  const rg = ctx.createRadialGradient(cx, H, 0, cx, H, maxR);
+  rg.addColorStop(0,    `rgba(235, 250, 255, ${baseOpacity * 1.6})`);
+  rg.addColorStop(0.06, `rgba(200, 238, 255, ${baseOpacity * 1.2})`);
+  rg.addColorStop(0.2,  `rgba(160, 220, 255, ${baseOpacity * 0.6})`);
+  rg.addColorStop(0.45, `rgba(120, 200, 255, ${baseOpacity * 0.2})`);
+  rg.addColorStop(0.75, `rgba(80,  180, 255, ${baseOpacity * 0.06})`);
+  rg.addColorStop(1,    'transparent');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Hot spot at apex — intense when speaking
+  const hotSize = 50 + pulse * 120;
+  const hot = ctx.createRadialGradient(cx, H, 0, cx, H, hotSize);
+  hot.addColorStop(0,   `rgba(255, 255, 255, ${0.05 + pulse * 0.22})`);
+  hot.addColorStop(0.3, `rgba(200, 240, 255, ${0.04 + pulse * 0.10})`);
+  hot.addColorStop(1,   'transparent');
+  ctx.fillStyle = hot;
+  ctx.fillRect(cx - hotSize, H - hotSize, hotSize * 2, hotSize);
+}
+
+// ── Agent connector lines: diagonal → horizontal to node ──────────────────
+// Hub sits inside the visible cone body
+function coneHub() { return { x: cx, y: H * 0.70 }; }
+
+function drawAgentLines() {
+  const hub = coneHub();
+  AGENTS.forEach(agent => {
+    const { nodeX, nodeY } = agentPos(agent);
+    const isIdle = agent.status === 'idle';
+    const spawnT = agent._spawnAge !== undefined
+      ? Math.min(1, agent._spawnAge / 45) : 1;
+    if (spawnT <= 0) return;
+
+    // Elbow: same y as node, with a short horizontal run before reaching it
+    const elbowGap = 48; // px of horizontal segment at the end
+    const elbowX   = agent.side === 'left' ? nodeX + elbowGap : nodeX - elbowGap;
+    const elbowY   = nodeY;
+
+    ctx.save();
+    ctx.globalAlpha = spawnT;
+    ctx.beginPath();
+    ctx.moveTo(hub.x, hub.y);   // start inside cone
+    ctx.lineTo(elbowX, elbowY); // diagonal segment
+    ctx.lineTo(nodeX,  nodeY);  // horizontal run to node
+
+    ctx.setLineDash(agent.dotted ? [3, 7] : []);
+    ctx.strokeStyle = isIdle
+      ? 'rgba(100, 160, 200, 0.22)'
+      : 'rgba(140, 210, 255, 0.38)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// ── Agent nodes ────────────────────────────────────────────────────────────
+const NODE_R = 7;
+
+function drawAgentNodes() {
+  hoveredAgent = null;
+
+  AGENTS.forEach(agent => {
+    const { nodeX, nodeY } = agentPos(agent);
+    const isIdle    = agent.status === 'idle';
+    const isWorking = agent.status === 'working';
+    const dist      = Math.hypot(mouseX - nodeX, mouseY - nodeY);
+
+    if (dist < NODE_R + 14) hoveredAgent = agent;
+
+    agent._phase += 0.025;
+
+    // Spawn animation
+    if (agent._spawnAge === undefined) agent._spawnAge = 999;
+    if (agent._spawnAge < 60) agent._spawnAge++;
+    const spawnT  = Math.min(1, agent._spawnAge / 45);
+    const spawnScale = spawnT < 1 ? 0.2 + 0.8 * (1 - Math.pow(1 - spawnT, 3)) : 1;
+    const spawnFlash = spawnT < 1 ? (1 - spawnT) * 0.6 : 0;
+
+    ctx.save();
+    ctx.globalAlpha = spawnT;
+    ctx.translate(nodeX, nodeY);
+    ctx.scale(spawnScale, spawnScale);
+    ctx.translate(-nodeX, -nodeY);
+
+    // Outer pulse ring
+    if (!isIdle) {
+      const pulse     = Math.sin(agent._phase) * 0.5 + 0.5;
+      const ringR     = NODE_R + 6 + pulse * 8;
+      const ringAlpha = (isWorking ? 0.18 + pulse * 0.12 : 0.1 + pulse * 0.06) + spawnFlash;
+      ctx.beginPath();
+      ctx.arc(nodeX, nodeY, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(140, 220, 255, ${ringAlpha})`;
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+    }
+
+    // Spawn flash ring
+    if (spawnFlash > 0) {
+      const fr = NODE_R + 20 * (1 - spawnT);
+      ctx.beginPath();
+      ctx.arc(nodeX, nodeY, fr, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(180, 230, 255, ${spawnFlash * 0.8})`;
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+    }
+
+    // Glow
+    const glowR = NODE_R * 3.5;
+    const glow  = ctx.createRadialGradient(nodeX, nodeY, 0, nodeX, nodeY, glowR);
+    const gc    = isIdle ? '80, 140, 180' : '140, 210, 255';
+    glow.addColorStop(0, `rgba(${gc}, ${isIdle ? 0.08 : 0.2 + spawnFlash * 0.3})`);
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(nodeX, nodeY, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(nodeX, nodeY, NODE_R, 0, Math.PI * 2);
+    ctx.fillStyle   = isIdle ? 'rgba(20, 45, 65, 0.9)' : 'rgba(10, 30, 55, 0.95)';
+    ctx.fill();
+    ctx.strokeStyle = isIdle
+      ? 'rgba(80, 140, 180, 0.4)'
+      : `rgba(140, 215, 255, ${0.65 + spawnFlash * 0.35})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(nodeX, nodeY, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = isIdle ? 'rgba(80, 140, 180, 0.5)' : 'rgba(180, 235, 255, 0.9)';
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+// ── Hover status card ──────────────────────────────────────────────────────
+function drawStatusCard(agent) {
+  const { nodeX, nodeY } = agentPos(agent);
+
+  const PAD   = 14;
+  const W_C   = 210;
+  const H_C   = 90;
+  const CORNER = 8;
+
+  // Position card: prefer outside (away from center)
+  let cardX = agent.side === 'right' ? nodeX + NODE_R + 14 : nodeX - NODE_R - 14 - W_C;
+  let cardY = nodeY - H_C / 2;
+
+  // Clamp to screen
+  cardX = Math.max(8, Math.min(W - W_C - 8, cardX));
+  cardY = Math.max(8, Math.min(H - H_C - 80, cardY));
+
+  // Card shadow
+  ctx.shadowColor  = 'rgba(0, 80, 160, 0.3)';
+  ctx.shadowBlur   = 20;
+
+  // Card background
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, W_C, H_C, CORNER);
+  ctx.fillStyle = 'rgba(4, 14, 28, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(100, 200, 255, 0.18)';
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+
+  // Status dot color
+  const dotColor = {
+    active:  '#4de8b0',
+    working: '#4da8ff',
+    idle:    '#445566',
+  }[agent.status] || '#445566';
+
+  const statusLabel = { active: 'active', working: 'working', idle: 'idle' }[agent.status];
+
+  // Agent name
+  ctx.font      = 'bold 11px Courier New';
+  ctx.fillStyle = 'rgba(200, 235, 255, 0.9)';
+  ctx.fillText(agent.name, cardX + PAD, cardY + PAD + 10);
+
+  // Status badge
+  ctx.beginPath();
+  ctx.arc(cardX + PAD, cardY + PAD + 26, 4, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor;
+  ctx.fill();
+  ctx.font      = '10px Courier New';
+  ctx.fillStyle = 'rgba(150, 200, 230, 0.6)';
+  ctx.fillText(statusLabel, cardX + PAD + 12, cardY + PAD + 30);
+
+  // Task description — wrap to 2 lines max
+  ctx.font      = '10px Courier New';
+  ctx.fillStyle = 'rgba(160, 210, 240, 0.75)';
+  const maxW  = W_C - PAD * 2;
+  const words = agent.task.split(' ');
+  let line    = '';
+  let lineY   = cardY + PAD + 48;
+  let lines   = 0;
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, cardX + PAD, lineY);
+      line  = word; lineY += 13; lines++;
+      if (lines >= 1) { ctx.fillText(line + '…', cardX + PAD, lineY); break; }
+    } else { line = test; }
+  }
+  if (lines < 1) ctx.fillText(line, cardX + PAD, lineY);
+
+  // Token bar
+  const barY  = cardY + H_C - 14;
+  const barW  = W_C - PAD * 2;
+  const fill  = agent.tokens / agent.maxTokens;
+
+  ctx.beginPath();
+  ctx.roundRect(cardX + PAD, barY, barW, 4, 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(cardX + PAD, barY, barW * fill, 4, 2);
+  const barColor = fill > 0.8 ? 'rgba(255,160,80,0.7)' : 'rgba(80,180,255,0.6)';
+  ctx.fillStyle = barColor;
+  ctx.fill();
+
+  // Token label
+  ctx.font      = '9px Courier New';
+  ctx.fillStyle = 'rgba(120, 170, 200, 0.5)';
+  const tkLabel = `${(agent.tokens/1000).toFixed(1)}k / ${(agent.maxTokens/1000).toFixed(0)}k tokens`;
+  ctx.fillText(tkLabel, cardX + PAD, barY - 3);
+}
+
+// ── Spawn ──────────────────────────────────────────────────────────────────
+function spawnParticles() {
+  const rate = 1 + Math.floor(amplitude * 3);
+  for (let i = 0; i < rate; i++) {
+    const p = getFreeParticle();
+    if (p) p.reset();
+  }
+}
+
+// ── Main loop ──────────────────────────────────────────────────────────────
+function drawFrame() {
+  requestAnimationFrame(drawFrame);
+  breathPhase += 0.009;
+  time++;
+  readAudio();
+
+  ctx.clearRect(0, 0, W, H);
+
+  const bg = ctx.createRadialGradient(cx, H * 0.75, 0, cx, H * 0.75, H * 1.1);
+  bg.addColorStop(0,   '#001525');
+  bg.addColorStop(0.5, '#040c18');
+  bg.addColorStop(1,   '#020a12');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  drawCone();
+  spawnParticles();
+
+  for (const p of particles) { if (!p.dead) { p.update(); p.draw(); } }
+
+  drawAgentNodes();
+
+  if (hoveredAgent) drawStatusCard(hoveredAgent);
+}
+
+// ── Audio init ─────────────────────────────────────────────────────────────
+async function initAudio() {
+  try {
+    const stream   = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source   = audioCtx.createMediaStreamSource(stream);
+    analyser       = audioCtx.createAnalyser();
+    analyser.fftSize              = 256;
+    analyser.smoothingTimeConstant = 0.82;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    source.connect(analyser);
+  } catch (e) {
+    errorEl.style.display = 'block';
+    console.warn('Mic unavailable — ambient mode.');
+  }
+}
+
+overlay.addEventListener('click', async () => {
+  overlay.classList.add('hidden');
+  await initAudio();
+});
+
+// ── Agent spawn ────────────────────────────────────────────────────────────
+const AGENT_NAMES = [
+  'Analyst', 'Planner', 'Critic', 'Synthesizer',
+  'Scout', 'Auditor', 'Curator', 'Validator',
+  'Navigator', 'Architect', 'Mapper', 'Distiller',
+];
+const AGENT_STATUSES = ['working', 'working', 'active', 'idle'];
+let _agentCount = AGENTS.length;
+
+function spawnAgent(task) {
+  const side  = _agentCount % 2 === 0 ? 'left' : 'right';
+  const name  = AGENT_NAMES[_agentCount % AGENT_NAMES.length] + ' ' + (_agentCount + 1);
+  const vFrac = 0.15 + Math.random() * 0.55;
+  const xFrac = side === 'left'
+    ? 0.05 + Math.random() * 0.1
+    : 0.85 + Math.random() * 0.1;
+  const status = AGENT_STATUSES[Math.floor(Math.random() * AGENT_STATUSES.length)];
+  const tokens = Math.floor(Math.random() * 20000) + 1000;
+
+  AGENTS.push({
+    id:       'agent-' + _agentCount,
+    name,
+    task:     task || 'Initializing…',
+    tokens,
+    maxTokens: 32000,
+    status,
+    side, vFrac, xFrac,
+    dotted:   status === 'idle',
+    _phase:   Math.random() * Math.PI * 2,
+    _spawnAge: 0,
+  });
+  _agentCount++;
+}
+
+// Chat bar
+sendBtn.addEventListener('click', () => {
+  const msg = chatInput.value.trim();
+  if (!msg) return;
+  spawnAgent(msg);
+  chatInput.value = '';
+});
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendBtn.click();
+});
+
+drawFrame();
+</script>
+</body>
+</html>

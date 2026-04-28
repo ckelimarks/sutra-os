@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Thread River G</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg: #0e0e10;
+    --surface: #18181c;
+    --surface-hover: #1f1f24;
+    --border: #2a2a30;
+    --text: #d4d4d8;
+    --text-dim: #71717a;
+    --text-faint: #52525b;
+    --sutra: #a78bfa;
+    --sutra-glow: rgba(167,139,250,0.15);
+    --agent-lovenotes: #f472b6;
+    --agent-jobsearch: #38bdf8;
+    --agent-teaching: #34d399;
+    --agent-health: #fb923c;
+    --agent-content: #c084fc;
+    --agent-geoint: #f87171;
+    --agent-portfolio: #facc15;
+    --agent-hackathon: #22d3ee;
+    --agent-brandywine: #a3e635;
+    --agent-sutra-meta: #818cf8;
+    --river-line: #27272a;
+    --collapse-speed: 0.4s;
+  }
+
+  html { font-size: 15px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+    line-height: 1.55;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    padding: 0 20px;
+    background: rgba(14,14,16,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-left { width: 80px; }
+  .header-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .header-title span { color: var(--sutra); }
+  .header-right {
+    width: 80px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* Scale view toggle */
+  .scale-toggle {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, color 0.2s;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .scale-toggle:hover {
+    border-color: var(--sutra);
+    color: var(--sutra);
+  }
+  .scale-toggle.active {
+    border-color: var(--sutra);
+    color: var(--sutra);
+    background: rgba(167,139,250,0.08);
+  }
+
+  /* ── Agent Cloud (scale view) ── */
+  .agent-cloud {
+    position: fixed;
+    top: 53px;
+    left: 0; right: 0;
+    z-index: 95;
+    background: rgba(14,14,16,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px 12px;
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    animation: cloudSlideIn 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  .agent-cloud.visible { display: flex; }
+  @keyframes cloudSlideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cloud-section-label {
+    width: 100%;
+    text-align: center;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-faint);
+    margin-bottom: 2px;
+    margin-top: 4px;
+  }
+  .cloud-section-label:first-child { margin-top: 0; }
+  .cloud-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border);
+    margin: 0 8px;
+    align-self: center;
+  }
+
+  .cloud-agent {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .cloud-agent:hover {
+    background: var(--surface-hover);
+  }
+  .cloud-agent .cloud-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cloud-agent.working .cloud-dot {
+    animation: cloudPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes cloudPulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 6px currentColor; }
+  }
+  .cloud-agent.offline {
+    opacity: 0.4;
+  }
+
+  /* ── River container ── */
+  .river-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 72px 20px 160px;
+    position: relative;
+    transition: padding-top 0.3s;
+  }
+  .river-wrap.cloud-open {
+    padding-top: 140px;
+  }
+  .river {
+    width: 100%;
+    max-width: 660px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+  }
+
+  /* Vertical river spine */
+  .river::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--river-line) 40px, var(--river-line) calc(100% - 40px), transparent);
+    pointer-events: none;
+  }
+
+  /* ── Cards ── */
+  .card {
+    position: relative;
+    padding: 16px 16px 16px 44px;
+    border-radius: 8px;
+    transition: background 0.2s, opacity 0.3s;
+    cursor: pointer;
+    animation: cardSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .card:hover { background: var(--surface); }
+
+  @keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* River dot on the spine */
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 22px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 2px solid var(--bg);
+    z-index: 2;
+    transition: background 0.2s;
+  }
+  .card:hover::before { background: var(--text-dim); }
+
+  /* User question */
+  .card-question {
+    font-size: 0.88rem;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  /* Answer */
+  .card-answer {
+    font-size: 0.93rem;
+    color: var(--text);
+    line-height: 1.6;
+    overflow: hidden;
+    transition: max-height var(--collapse-speed) cubic-bezier(0.16,1,0.3,1), opacity 0.3s;
+  }
+  .card-answer p { margin-bottom: 8px; }
+  .card-answer p:last-child { margin-bottom: 0; }
+
+  /* Collapsed state */
+  .card.collapsed .card-answer {
+    max-height: 1.6em;
+    opacity: 0.6;
+  }
+  .card.collapsed .card-answer::after {
+    content: '';
+    position: absolute;
+    bottom: 12px;
+    left: 44px;
+    right: 16px;
+    height: 28px;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+    pointer-events: none;
+  }
+  .card.collapsed:hover .card-answer { opacity: 0.85; }
+
+  /* ── Agent thread line ── */
+  .card.agent-routed {
+    margin-left: 20px;
+    padding-left: 36px;
+    border-left: 3px solid transparent;
+  }
+  .card.agent-routed::before {
+    left: 8px;
+  }
+
+  /* Thread connector line */
+  .card.agent-routed .thread-line {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  .card.agent-routed:hover .thread-line { opacity: 0.85; }
+
+  /* Agent label badge */
+  .agent-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding: 2px 8px 2px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.04);
+  }
+  .agent-label .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Agent colors */
+  .agent-lovenotes .thread-line { background: var(--agent-lovenotes); }
+  .agent-lovenotes .agent-label .dot { background: var(--agent-lovenotes); }
+  .agent-lovenotes .agent-label { color: var(--agent-lovenotes); }
+  .agent-lovenotes::before { background: var(--agent-lovenotes) !important; }
+
+  .agent-jobsearch .thread-line { background: var(--agent-jobsearch); }
+  .agent-jobsearch .agent-label .dot { background: var(--agent-jobsearch); }
+  .agent-jobsearch .agent-label { color: var(--agent-jobsearch); }
+  .agent-jobsearch::before { background: var(--agent-jobsearch) !important; }
+
+  .agent-teaching .thread-line { background: var(--agent-teaching); }
+  .agent-teaching .agent-label .dot { background: var(--agent-teaching); }
+  .agent-teaching .agent-label { color: var(--agent-teaching); }
+  .agent-teaching::before { background: var(--agent-teaching) !important; }
+
+  .agent-health .thread-line { background: var(--agent-health); }
+  .agent-health .agent-label .dot { background: var(--agent-health); }
+  .agent-health .agent-label { color: var(--agent-health); }
+  .agent-health::before { background: var(--agent-health) !important; }
+
+  .agent-content .thread-line { background: var(--agent-content); }
+  .agent-content .agent-label .dot { background: var(--agent-content); }
+  .agent-content .agent-label { color: var(--agent-content); }
+  .agent-content::before { background: var(--agent-content) !important; }
+
+  .agent-geoint .thread-line { background: var(--agent-geoint); }
+  .agent-geoint .agent-label .dot { background: var(--agent-geoint); }
+  .agent-geoint .agent-label { color: var(--agent-geoint); }
+  .agent-geoint::before { background: var(--agent-geoint) !important; }
+
+  .agent-portfolio .thread-line { background: var(--agent-portfolio); }
+  .agent-portfolio .agent-label .dot { background: var(--agent-portfolio); }
+  .agent-portfolio .agent-label { color: var(--agent-portfolio); }
+  .agent-portfolio::before { background: var(--agent-portfolio) !important; }
+
+  .agent-hackathon .thread-line { background: var(--agent-hackathon); }
+  .agent-hackathon .agent-label .dot { background: var(--agent-hackathon); }
+  .agent-hackathon .agent-label { color: var(--agent-hackathon); }
+  .agent-hackathon::before { background: var(--agent-hackathon) !important; }
+
+  .agent-brandywine .thread-line { background: var(--agent-brandywine); }
+  .agent-brandywine .agent-label .dot { background: var(--agent-brandywine); }
+  .agent-brandywine .agent-label { color: var(--agent-brandywine); }
+  .agent-brandywine::before { background: var(--agent-brandywine) !important; }
+
+  .agent-sutra-meta .thread-line { background: var(--agent-sutra-meta); }
+  .agent-sutra-meta .agent-label .dot { background: var(--agent-sutra-meta); }
+  .agent-sutra-meta .agent-label { color: var(--agent-sutra-meta); }
+  .agent-sutra-meta::before { background: var(--agent-sutra-meta) !important; }
+
+  /* Highlight state when agent circle is hovered */
+  .card.agent-routed.agent-highlight .thread-line { opacity: 1; }
+  .card.agent-routed.agent-dimmed { opacity: 0.25; }
+  .card:not(.agent-routed).agent-dimmed { opacity: 0.25; }
+  .card.agent-dimmed { transition: opacity 0.3s; }
+
+  /* ── Thread Group ── */
+  .thread-group {
+    margin-left: 20px;
+    position: relative;
+  }
+  .thread-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 8px 36px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+    user-select: none;
+    position: relative;
+  }
+  .thread-group-header:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .thread-group-header::before {
+    content: '';
+    position: absolute;
+    left: 28px;
+    top: 14px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    z-index: 2;
+  }
+  .thread-group-header .tg-chevron {
+    transition: transform 0.2s;
+    font-size: 0.65rem;
+    opacity: 0.5;
+  }
+  .thread-group.collapsed .tg-chevron {
+    transform: rotate(-90deg);
+  }
+  .thread-group.collapsed .thread-group-cards {
+    display: none;
+  }
+  .thread-group-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* ── Timestamp ── */
+  .card-time {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .card:hover .card-time { opacity: 1; }
+
+  /* ── Reply button (on hover) ── */
+  .card-reply-btn {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-faint);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+    font-size: 0.65rem;
+    z-index: 5;
+  }
+  .card:hover .card-reply-btn { opacity: 1; }
+  .card-reply-btn:hover {
+    border-color: var(--sutra);
+    color: var(--sutra);
+    background: rgba(167,139,250,0.06);
+  }
+
+  /* ── Inline Reply ── */
+  .inline-reply {
+    margin-left: 20px;
+    padding: 10px 12px 10px 36px;
+    position: relative;
+    animation: cardSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .inline-reply::before {
+    content: '';
+    position: absolute;
+    left: 28px;
+    top: 16px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    z-index: 2;
+  }
+  .inline-reply-target {
+    font-size: 0.68rem;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .inline-reply-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .inline-reply-input {
+    flex: 1;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .inline-reply-input:focus {
+    border-color: rgba(167,139,250,0.4);
+  }
+  .inline-reply-input::placeholder {
+    color: var(--text-faint);
+  }
+  .inline-reply-hint {
+    font-size: 0.6rem;
+    color: var(--text-faint);
+    margin-top: 4px;
+    padding-left: 2px;
+  }
+
+  /* Inline reply response (indented) */
+  .inline-reply-response {
+    margin-left: 40px;
+    padding: 10px 12px 10px 20px;
+    position: relative;
+    animation: cardSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) both;
+    border-left: 2px solid var(--border);
+    border-radius: 0 6px 6px 0;
+  }
+  .inline-reply-response:hover {
+    background: var(--surface);
+  }
+  .inline-reply-response .ir-question {
+    font-size: 0.78rem;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .inline-reply-response .ir-answer {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  /* ── File Chips ── */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px 3px 6px;
+    margin: 4px 4px 4px 0;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+    font-size: 0.73rem;
+    color: var(--text-dim);
+    cursor: default;
+    transition: border-color 0.2s, background 0.2s;
+    vertical-align: middle;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    letter-spacing: -0.02em;
+  }
+  .file-chip:hover {
+    border-color: var(--text-faint);
+    background: rgba(255,255,255,0.06);
+  }
+  .file-chip .fc-icon {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    font-family: inherit;
+  }
+  .file-chip .fc-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-chip .fc-actions {
+    display: flex;
+    gap: 2px;
+    margin-left: 2px;
+  }
+  .file-chip .fc-btn {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    transition: background 0.15s, color 0.15s;
+  }
+  .file-chip .fc-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+  }
+
+  /* ── Routing animation line ── */
+  .routing-line {
+    position: fixed;
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .routing-line.visible { opacity: 1; }
+  .routing-line svg {
+    overflow: visible;
+  }
+  .routing-line path {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-dasharray: 80;
+    stroke-dashoffset: 80;
+    animation: routeDash 0.8s ease forwards;
+  }
+  @keyframes routeDash {
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* ── Agent Presence (right edge, column view) ── */
+  .agent-presence {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 90;
+    transition: opacity 0.3s;
+  }
+  .agent-presence.hidden { opacity: 0; pointer-events: none; }
+  .agent-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.3s;
+    border: 1.5px solid transparent;
+  }
+  .agent-circle:hover {
+    transform: scale(1.15);
+  }
+  .agent-circle::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  /* Pulse animation for active agents */
+  .agent-circle.active::after {
+    animation: agentPulse 2.5s ease-in-out infinite;
+  }
+  .agent-circle.route-pulse {
+    animation: routePulseAnim 0.6s ease;
+  }
+  @keyframes routePulseAnim {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+    50% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+  @keyframes agentPulse {
+    0%, 100% { opacity: 0; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.4); }
+  }
+
+  /* Per-agent circle colors */
+  .agent-circle.c-lovenotes { background: rgba(244,114,182,0.12); color: var(--agent-lovenotes); border-color: rgba(244,114,182,0.25); }
+  .agent-circle.c-lovenotes::after { box-shadow: 0 0 12px var(--agent-lovenotes); }
+  .agent-circle.c-lovenotes:hover { box-shadow: 0 0 16px rgba(244,114,182,0.3); }
+
+  .agent-circle.c-jobsearch { background: rgba(56,189,248,0.12); color: var(--agent-jobsearch); border-color: rgba(56,189,248,0.25); }
+  .agent-circle.c-jobsearch::after { box-shadow: 0 0 12px var(--agent-jobsearch); }
+  .agent-circle.c-jobsearch:hover { box-shadow: 0 0 16px rgba(56,189,248,0.3); }
+
+  .agent-circle.c-teaching { background: rgba(52,211,153,0.12); color: var(--agent-teaching); border-color: rgba(52,211,153,0.25); }
+  .agent-circle.c-teaching::after { box-shadow: 0 0 12px var(--agent-teaching); }
+  .agent-circle.c-teaching:hover { box-shadow: 0 0 16px rgba(52,211,153,0.3); }
+
+  .agent-circle.c-health { background: rgba(251,146,60,0.12); color: var(--agent-health); border-color: rgba(251,146,60,0.25); }
+  .agent-circle.c-health::after { box-shadow: 0 0 12px var(--agent-health); }
+  .agent-circle.c-health:hover { box-shadow: 0 0 16px rgba(251,146,60,0.3); }
+
+  .agent-circle.c-content { background: rgba(192,132,252,0.12); color: var(--agent-content); border-color: rgba(192,132,252,0.25); }
+  .agent-circle.c-content::after { box-shadow: 0 0 12px var(--agent-content); }
+  .agent-circle.c-content:hover { box-shadow: 0 0 16px rgba(192,132,252,0.3); }
+
+  .agent-circle.c-geoint { background: rgba(248,113,113,0.12); color: var(--agent-geoint); border-color: rgba(248,113,113,0.25); }
+  .agent-circle.c-geoint::after { box-shadow: 0 0 12px var(--agent-geoint); }
+  .agent-circle.c-geoint:hover { box-shadow: 0 0 16px rgba(248,113,113,0.3); }
+
+  .agent-circle.c-portfolio { background: rgba(250,204,21,0.12); color: var(--agent-portfolio); border-color: rgba(250,204,21,0.25); }
+  .agent-circle.c-portfolio::after { box-shadow: 0 0 12px var(--agent-portfolio); }
+  .agent-circle.c-portfolio:hover { box-shadow: 0 0 16px rgba(250,204,21,0.3); }
+
+  .agent-circle.c-hackathon { background: rgba(34,211,238,0.12); color: var(--agent-hackathon); border-color: rgba(34,211,238,0.25); }
+  .agent-circle.c-hackathon::after { box-shadow: 0 0 12px var(--agent-hackathon); }
+  .agent-circle.c-hackathon:hover { box-shadow: 0 0 16px rgba(34,211,238,0.3); }
+
+  .agent-circle.c-brandywine { background: rgba(163,230,53,0.12); color: var(--agent-brandywine); border-color: rgba(163,230,53,0.25); }
+  .agent-circle.c-brandywine::after { box-shadow: 0 0 12px var(--agent-brandywine); }
+  .agent-circle.c-brandywine:hover { box-shadow: 0 0 16px rgba(163,230,53,0.3); }
+
+  .agent-circle.c-sutra-meta { background: rgba(129,140,248,0.12); color: var(--agent-sutra-meta); border-color: rgba(129,140,248,0.25); }
+  .agent-circle.c-sutra-meta::after { box-shadow: 0 0 12px var(--agent-sutra-meta); }
+  .agent-circle.c-sutra-meta:hover { box-shadow: 0 0 16px rgba(129,140,248,0.3); }
+
+  /* Agent tooltip */
+  .agent-circle .tooltip {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    color: var(--text);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .agent-circle:hover .tooltip { opacity: 1; }
+
+  /* ── River Depth Indicator ── */
+  .river-depth {
+    position: fixed;
+    right: 12px;
+    top: 72px;
+    bottom: 160px;
+    width: 2px;
+    background: var(--river-line);
+    border-radius: 1px;
+    z-index: 80;
+    opacity: 0.4;
+  }
+  .river-depth-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to bottom, var(--sutra), transparent);
+    border-radius: 1px;
+    transition: height 0.3s ease;
+  }
+  .river-depth-thumb {
+    position: absolute;
+    left: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sutra);
+    transition: top 0.3s ease;
+    box-shadow: 0 0 6px var(--sutra-glow);
+  }
+
+  /* ── Ambient Status Bar ── */
+  .status-bar {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 5px 16px;
+    border-radius: 999px;
+    background: rgba(24,24,28,0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    font-size: 0.65rem;
+    color: var(--text-faint);
+    z-index: 99;
+    white-space: nowrap;
+    cursor: default;
+    animation: statusFadeIn 1s ease 0.5s both;
+  }
+  @keyframes statusFadeIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .status-bar .sb-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-bar .sb-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .status-bar .sb-dot.green { background: #34d399; }
+  .status-bar .sb-dot.amber { background: #fb923c; }
+  .status-bar .sb-divider {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
+  }
+  .status-bar .sb-report {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .status-bar .sb-report:hover {
+    color: var(--text-dim);
+  }
+
+  /* ── Input Bar ── */
+  .input-wrap {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 16px 20px 28px;
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
+    z-index: 100;
+  }
+  .input-bar {
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+  }
+  .input-field {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .input-field::placeholder {
+    color: var(--text-faint);
+  }
+  .input-field:focus {
+    border-color: rgba(167,139,250,0.4);
+    box-shadow: 0 0 0 3px var(--sutra-glow), 0 0 24px var(--sutra-glow);
+  }
+
+  /* Subtle idle glow */
+  .input-field:not(:focus) {
+    animation: idleGlow 4s ease-in-out infinite;
+  }
+  @keyframes idleGlow {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 12px var(--sutra-glow); }
+  }
+
+  /* Keyboard hints */
+  .input-hints {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    font-size: 0.68rem;
+    color: var(--text-faint);
+    opacity: 0;
+    transition: opacity 0.5s;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .input-hints.visible { opacity: 1; }
+  .input-hints kbd {
+    font-family: inherit;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 0.65rem;
+    margin-right: 3px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .agent-presence { display: none; }
+    .river-depth { display: none; }
+    .river { max-width: 100%; }
+    .card.agent-routed { margin-left: 10px; }
+    .inline-reply { margin-left: 10px; }
+    .inline-reply-response { margin-left: 20px; }
+    .thread-group { margin-left: 10px; }
+    .status-bar { gap: 10px; padding: 4px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left"></div>
+  <div class="header-title"><span>sutra</span> / thread river</div>
+  <div class="header-right">
+    <button class="scale-toggle" id="scaleToggle" title="Toggle agent cloud view">
+      <!-- Grid icon -->
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="1" width="5" height="5" rx="1"/>
+        <rect x="10" y="1" width="5" height="5" rx="1"/>
+        <rect x="1" y="10" width="5" height="5" rx="1"/>
+        <rect x="10" y="10" width="5" height="5" rx="1"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- Agent Cloud (scale view) -->
+<div class="agent-cloud" id="agentCloud"></div>
+
+<div class="river-wrap" id="riverWrap">
+  <div class="river" id="river">
+    <!-- Cards injected by JS -->
+  </div>
+</div>
+
+<!-- Agent Presence (column view) -->
+<div class="agent-presence" id="agentPresence"></div>
+
+<!-- River Depth -->
+<div class="river-depth" id="riverDepth">
+  <div class="river-depth-fill" id="riverDepthFill"></div>
+  <div class="river-depth-thumb" id="riverDepthThumb"></div>
+</div>
+
+<!-- Ambient Status Bar -->
+<div class="status-bar" id="statusBar">
+  <div class="sb-item"><span class="sb-dot green"></span> 10 agents</div>
+  <div class="sb-divider"></div>
+  <div class="sb-item"><span class="sb-dot amber"></span> 3 working</div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">$0.47 session</div>
+  <div class="sb-divider"></div>
+  <div class="sb-report" id="statusReport">GEOINT: hotspot tracking updated, 4 new events flagged</div>
+</div>
+
+<!-- Input -->
+<div class="input-wrap">
+  <div class="input-bar">
+    <div class="input-hints" id="inputHints">
+      <span><kbd>/</kbd> commands</span>
+      <span><kbd>@</kbd> agent</span>
+      <span><kbd>Esc</kbd> dismiss reply</span>
+    </div>
+    <input type="text" class="input-field" id="inputField" placeholder="Ask Sutra anything..." autocomplete="off">
+  </div>
+</div>
+
+<!-- Routing animation overlay -->
+<div class="routing-line" id="routingLine"></div>
+
+<script>
+// ── Data ──
+const agents = [
+  { id: 'lovenotes',  label: 'LoveNotes',  short: 'LN', status: 'working' },
+  { id: 'jobsearch',  label: 'Job Search', short: 'JS', status: 'working' },
+  { id: 'teaching',   label: 'Teaching',    short: 'TE', status: 'idle' },
+  { id: 'health',     label: 'Health',      short: 'HE', status: 'idle' },
+  { id: 'content',    label: 'Content',     short: 'CO', status: 'working' },
+  { id: 'geoint',     label: 'GEOINT',      short: 'GI', status: 'idle' },
+  { id: 'portfolio',  label: 'Portfolio',   short: 'PF', status: 'idle' },
+  { id: 'hackathon',  label: 'Hackathon',   short: 'HK', status: 'idle' },
+  { id: 'brandywine', label: 'Brandywine',  short: 'BW', status: 'offline' },
+  { id: 'sutra-meta', label: 'Sutra Meta',  short: 'SM', status: 'offline' },
+];
+
+const conversation = [
+  // 1. Morning prompt (Sutra direct)
+  {
+    question: 'Good morning. What should I focus on today?',
+    answer: 'Three things for today. First: your LoveNotes trial conversion analysis is overdue — 0 of 11 converted and you have interview data waiting. Second: the Remington mid-semester grades close Friday, 315 students need final review. Third: you mentioned wanting to run before noon. Routing details to the relevant agents.',
+    time: '8:12 AM',
+    agent: null,
+    files: [],
+  },
+  // 2. LoveNotes response (routed)
+  {
+    question: null,
+    answer: 'Trial conversion is the critical number right now. Zero out of eleven is a signal, not a fluke. Your v4.1 "pure appreciation" curriculum optimized for completion but may have destroyed perceived value — therapists called it "emotional cotton candy." The one user who converted was on the harder v4 curriculum. I recommend: block 90 minutes this morning for the two user interviews you have scheduled, then draft a v4.2 spec with action prompts and stretch questions.',
+    time: '8:12 AM',
+    agent: 'lovenotes',
+    files: [],
+  },
+  // 3. Job search question
+  {
+    question: 'What is the status of my job search? Any updates I missed?',
+    answer: 'Routing to your job search agent for the latest state.',
+    time: '8:15 AM',
+    agent: null,
+    files: [],
+  },
+  // 4. Job search response
+  {
+    question: null,
+    answer: 'You are in final-stage interviews with two companies. Emmanuel sent a follow-up email yesterday at 4:47 PM — he wants to schedule your panel for Thursday or Friday this week. You have not replied yet. Your portfolio site has three broken links on the project cards — I flagged these last session but they remain unfixed. Recommended next action: reply to Emmanuel within the hour, then fix the portfolio links.',
+    time: '8:15 AM',
+    agent: 'jobsearch',
+    files: [],
+  },
+  // 5. Teaching question
+  {
+    question: 'How are my Remington students doing? Anything urgent?',
+    answer: 'Let me check with teaching.',
+    time: '8:24 AM',
+    agent: null,
+    files: [],
+  },
+  // 6. Teaching response (will be in thread group with next)
+  {
+    question: null,
+    answer: '315 students across 6 sections. Grade submissions close Friday at 5 PM. You have 23 students flagged for missing assignments — 8 of those are in your Tuesday/Thursday section and have a pattern of late submissions. No new escalations from the department. One student (M. Torres) emailed asking about extra credit — this is the third time. The maintenance approach is working: everything is running, nothing needs heroics.',
+    time: '8:24 AM',
+    agent: 'teaching',
+    files: [],
+    threadGroup: 'teaching-grading',
+  },
+  // 7. Teaching follow-up (same agent consecutive, grouped)
+  {
+    question: null,
+    answer: 'I drafted a batch reminder email for the 23 flagged students. Subject line: "Assignment Deadline Reminder — Action Required by Friday." The tone is firm but supportive. Review and send when ready.',
+    time: '8:25 AM',
+    agent: 'teaching',
+    files: [{ name: 'drafts/reminder-email.md', path: 'Projects/teaching/remington/drafts/reminder-email.md' }],
+    threadGroup: 'teaching-grading',
+  },
+  // 8. Content agent with file creation
+  {
+    question: 'Draft a GEOINT post based on today\'s hotspot analysis.',
+    answer: 'Routing to content agent. It will pull from GEOINT\'s latest report.',
+    time: '9:10 AM',
+    agent: null,
+    files: [],
+  },
+  // 9. Content response with files
+  {
+    question: null,
+    answer: 'Drafted a thread based on the GEOINT briefing. Three-part structure: (1) the methodology — how open-source satellite imagery reveals patterns invisible at ground level, (2) today\'s specific findings — 4 new hotspot events in the eastern corridor, (3) the larger question about civilian access to intelligence-grade analysis. The draft is ready for your review.',
+    time: '9:12 AM',
+    agent: 'content',
+    files: [
+      { name: 'content/geoint-post.md', path: 'Projects/content/drafts/geoint-post.md' },
+      { name: 'content/geoint-thread-assets.md', path: 'Projects/content/drafts/geoint-thread-assets.md' },
+    ],
+  },
+  // 10. Clarity request (Sutra + Health)
+  {
+    question: 'I feel scattered. Too many things pulling at me. Help me get clarity.',
+    answer: 'Pausing. Let me look at what is actually competing for your attention right now.',
+    time: '9:30 AM',
+    agent: null,
+    files: [],
+  },
+  // 11. Health/clarity response
+  {
+    question: null,
+    answer: '<p>You have four streams pulling at you today. Here is the honest ranking:</p><p><strong>1. LoveNotes user interviews</strong> — time-sensitive, scheduled, high-leverage. This is the one thing that moves the needle most.</p><p><strong>2. Reply to Emmanuel</strong> — two minutes, high stakes. Just do it before the interviews.</p><p><strong>3. Remington grade review</strong> — 20 minutes, has a hard deadline Friday. Schedule it for late afternoon.</p><p><strong>4. Run</strong> — your body is part of the system. Non-negotiable but flexible on timing. After the interviews.</p><p>Everything else is noise today. The portfolio links, the content post, the monthly review — those are tomorrow problems.</p>',
+    time: '9:30 AM',
+    agent: 'health',
+    files: [],
+  },
+];
+
+// Inline reply demo data (pre-expanded)
+const inlineReplyDemo = {
+  afterCardIndex: 1, // After the LoveNotes card
+  targetAgent: 'lovenotes',
+  targetLabel: 'LoveNotes',
+  question: 'Which two users are scheduled for interviews today?',
+  answer: 'Sarah K. at 10:30 AM (couple #7, dropped off at week 3 of v4.1) and Marcus D. at 11:15 AM (couple #4, completed v4.1 but did not convert). Sarah is the higher-priority conversation — she was initially enthusiastic and her dropoff correlates with the "pure appreciation" phase of the curriculum.',
+};
+
+// ── Render Agent Cloud (scale view) ──
+const cloudEl = document.getElementById('agentCloud');
+function renderCloud() {
+  cloudEl.innerHTML = '';
+  const groups = { working: [], idle: [], offline: [] };
+  agents.forEach(a => groups[a.status].push(a));
+
+  Object.entries(groups).forEach(([status, list]) => {
+    if (list.length === 0) return;
+    list.forEach(a => {
+      const chip = document.createElement('div');
+      chip.className = `cloud-agent ${status}`;
+      chip.dataset.agent = a.id;
+      chip.innerHTML = `<span class="cloud-dot" style="background: var(--agent-${a.id}); color: var(--agent-${a.id});"></span>${a.label}`;
+      chip.addEventListener('mouseenter', () => highlightAgent(a.id));
+      chip.addEventListener('mouseleave', () => clearHighlight());
+      cloudEl.appendChild(chip);
+    });
+    // Add divider between groups (but not after last)
+    if (status !== 'offline') {
+      const div = document.createElement('div');
+      div.className = 'cloud-divider';
+      cloudEl.appendChild(div);
+    }
+  });
+}
+renderCloud();
+
+// ── Render Agent Presence (column view) ──
+const presenceEl = document.getElementById('agentPresence');
+agents.forEach(a => {
+  const circle = document.createElement('div');
+  circle.className = `agent-circle c-${a.id}`;
+  if (a.status === 'working') circle.classList.add('active');
+  circle.dataset.agent = a.id;
+  circle.innerHTML = `${a.short}<span class="tooltip">${a.label} — ${a.status}</span>`;
+  if (a.status === 'offline') circle.style.opacity = '0.35';
+  circle.addEventListener('mouseenter', () => highlightAgent(a.id));
+  circle.addEventListener('mouseleave', () => clearHighlight());
+  presenceEl.appendChild(circle);
+});
+
+// ── Scale toggle ──
+const scaleToggle = document.getElementById('scaleToggle');
+const riverWrap = document.getElementById('riverWrap');
+let cloudOpen = false;
+
+scaleToggle.addEventListener('click', () => {
+  cloudOpen = !cloudOpen;
+  scaleToggle.classList.toggle('active', cloudOpen);
+  cloudEl.classList.toggle('visible', cloudOpen);
+  riverWrap.classList.toggle('cloud-open', cloudOpen);
+  presenceEl.classList.toggle('hidden', cloudOpen);
+});
+
+// ── Render Cards ──
+const riverEl = document.getElementById('river');
+const COLLAPSE_DELAY = 60000;
+let cardElements = [];
+
+// Track thread groups
+let currentThreadGroup = null;
+let threadGroupContainer = null;
+let threadGroupCardCount = 0;
+
+function createReplyBtn(card, agentId, agentLabel) {
+  const btn = document.createElement('button');
+  btn.className = 'card-reply-btn';
+  btn.title = `Reply to ${agentLabel}`;
+  btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3L2 7l4 4"/><path d="M2 7h8a4 4 0 014 4v1"/></svg>`;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openInlineReply(card, agentId, agentLabel);
+  });
+  card.appendChild(btn);
+}
+
+function openInlineReply(afterEl, agentId, agentLabel) {
+  // Remove any existing inline reply inputs
+  document.querySelectorAll('.inline-reply').forEach(el => el.remove());
+
+  const reply = document.createElement('div');
+  reply.className = 'inline-reply';
+  const target = document.createElement('div');
+  target.className = 'inline-reply-target';
+  target.style.color = `var(--agent-${agentId})`;
+  target.textContent = `replying to ${agentLabel}`;
+  reply.appendChild(target);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-reply-input-wrap';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'inline-reply-input';
+  input.placeholder = `Ask ${agentLabel}...`;
+  input.style.borderColor = `rgba(167,139,250,0.3)`;
+  wrap.appendChild(input);
+  reply.appendChild(wrap);
+
+  const hint = document.createElement('div');
+  hint.className = 'inline-reply-hint';
+  hint.textContent = 'Enter to send, Esc to dismiss';
+  reply.appendChild(hint);
+
+  afterEl.parentNode.insertBefore(reply, afterEl.nextSibling);
+  input.focus();
+
+  // Escape to dismiss
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      reply.remove();
+    }
+    if (e.key === 'Enter' && input.value.trim()) {
+      const text = input.value.trim();
+      reply.remove();
+      // Create inline reply response
+      const resp = document.createElement('div');
+      resp.className = 'inline-reply-response';
+      resp.style.borderLeftColor = `var(--agent-${agentId})`;
+      resp.innerHTML = `
+        <div class="ir-question">${text}</div>
+        <div class="ir-answer" style="color: var(--text-faint); font-style: italic;">Thinking...</div>
+      `;
+      afterEl.parentNode.insertBefore(resp, afterEl.nextSibling);
+      setTimeout(() => {
+        resp.querySelector('.ir-answer').textContent = 'In a live session, ' + agentLabel + ' would respond here with context from its active workspace.';
+        resp.querySelector('.ir-answer').style.color = '';
+        resp.querySelector('.ir-answer').style.fontStyle = '';
+      }, 1200);
+    }
+  });
+
+  // Click outside to dismiss
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!reply.contains(e.target)) {
+        reply.remove();
+        document.removeEventListener('click', handler);
+      }
+    };
+    document.addEventListener('click', handler);
+  }, 100);
+}
+
+function createFileChips(files, container) {
+  if (!files || files.length === 0) return;
+  const chipWrap = document.createElement('div');
+  chipWrap.style.marginTop = '8px';
+
+  files.forEach(f => {
+    const chip = document.createElement('span');
+    chip.className = 'file-chip';
+    chip.innerHTML = `
+      <span class="fc-icon"><svg width="10" height="11" viewBox="0 0 12 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1H2.5A1.5 1.5 0 001 2.5v9A1.5 1.5 0 002.5 13h7a1.5 1.5 0 001.5-1.5V5L7 1z"/><path d="M7 1v4h4"/></svg></span>
+      <span class="fc-name">${f.name}</span>
+      <span class="fc-actions">
+        <button class="fc-btn" title="Open file"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 7v3.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 010 10.5v-7A1.5 1.5 0 011.5 2H5"/><path d="M7 0h5v5"/><path d="M12 0L5.5 6.5"/></svg></button>
+        <button class="fc-btn" title="Reveal in Finder"><svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="10" height="9" rx="1.5"/><path d="M1 5h10"/><circle cx="3" cy="3.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="5" cy="3.5" r="0.5" fill="currentColor" stroke="none"/></svg></button>
+      </span>
+    `;
+    chip.addEventListener('click', (e) => e.stopPropagation());
+    chipWrap.appendChild(chip);
+  });
+
+  container.appendChild(chipWrap);
+}
+
+function renderCard(item, i, parentEl) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.animationDelay = `${i * 0.06}s`;
+
+  if (item.agent) {
+    card.classList.add('agent-routed', `agent-${item.agent}`);
+    card.dataset.agent = item.agent;
+    const threadLine = document.createElement('div');
+    threadLine.className = 'thread-line';
+    card.appendChild(threadLine);
+
+    const agentInfo = agents.find(a => a.id === item.agent);
+    const label = document.createElement('div');
+    label.className = 'agent-label';
+    label.innerHTML = `<span class="dot"></span>${agentInfo.label}`;
+    card.appendChild(label);
+
+    // Add reply button for agent cards
+    createReplyBtn(card, item.agent, agentInfo.label);
+  }
+
+  if (item.question) {
+    const q = document.createElement('div');
+    q.className = 'card-question';
+    q.textContent = item.question;
+    card.appendChild(q);
+  }
+
+  const ans = document.createElement('div');
+  ans.className = 'card-answer';
+  if (item.answer.startsWith('<')) {
+    ans.innerHTML = item.answer;
+  } else {
+    const p = document.createElement('p');
+    p.textContent = item.answer;
+    ans.appendChild(p);
+  }
+  // File chips inline
+  createFileChips(item.files, ans);
+  card.appendChild(ans);
+
+  const time = document.createElement('div');
+  time.className = 'card-time';
+  time.textContent = item.time;
+  card.appendChild(time);
+
+  // Click to toggle collapse
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.card-reply-btn') || e.target.closest('.file-chip')) return;
+    card.classList.toggle('collapsed');
+    clearTimeout(card._collapseTimer);
+    if (!card.classList.contains('collapsed')) {
+      card._collapseTimer = setTimeout(() => {
+        card.classList.add('collapsed');
+      }, COLLAPSE_DELAY);
+    }
+  });
+
+  parentEl.appendChild(card);
+  cardElements.push(card);
+  return card;
+}
+
+// Render conversation with thread grouping
+let i = 0;
+while (i < conversation.length) {
+  const item = conversation[i];
+
+  // Check if this starts or continues a thread group
+  if (item.threadGroup) {
+    const groupId = item.threadGroup;
+    // Collect all consecutive items with the same threadGroup
+    const groupItems = [];
+    let j = i;
+    while (j < conversation.length && conversation[j].threadGroup === groupId) {
+      groupItems.push(conversation[j]);
+      j++;
+    }
+
+    if (groupItems.length >= 2) {
+      // Create thread group
+      const agentInfo = agents.find(a => a.id === groupItems[0].agent);
+      const group = document.createElement('div');
+      group.className = 'thread-group';
+      group.dataset.agent = groupItems[0].agent;
+
+      const header = document.createElement('div');
+      header.className = 'thread-group-header';
+      header.style.color = `var(--agent-${groupItems[0].agent})`;
+      header.innerHTML = `<span class="tg-chevron">&#9660;</span> ${agentInfo.label} — ${groupItems.length} messages`;
+      header.style.setProperty('--agent-color', `var(--agent-${groupItems[0].agent})`);
+      header.querySelector('.tg-chevron').style.color = `var(--agent-${groupItems[0].agent})`;
+
+      header.addEventListener('click', () => {
+        group.classList.toggle('collapsed');
+      });
+
+      group.appendChild(header);
+
+      const cardsWrap = document.createElement('div');
+      cardsWrap.className = 'thread-group-cards';
+
+      groupItems.forEach((gi, gi_idx) => {
+        renderCard(gi, i + gi_idx, cardsWrap);
+      });
+
+      group.appendChild(cardsWrap);
+      riverEl.appendChild(group);
+      i = j;
+    } else {
+      renderCard(item, i, riverEl);
+      i++;
+    }
+  } else {
+    renderCard(item, i, riverEl);
+    i++;
+  }
+}
+
+// ── Render pre-expanded inline reply demo ──
+// Find the LoveNotes card (index 1)
+const lnCard = cardElements[1]; // Second card rendered
+if (lnCard) {
+  // Create the inline reply response directly
+  const demoResp = document.createElement('div');
+  demoResp.className = 'inline-reply-response';
+  demoResp.style.borderLeftColor = `var(--agent-${inlineReplyDemo.targetAgent})`;
+  demoResp.style.animationDelay = '0.3s';
+  demoResp.innerHTML = `
+    <div class="ir-question">${inlineReplyDemo.question}</div>
+    <div class="ir-answer">${inlineReplyDemo.answer}</div>
+  `;
+  // Insert after the LoveNotes card
+  lnCard.parentNode.insertBefore(demoResp, lnCard.nextSibling);
+}
+
+// ── Agent Highlighting ──
+function highlightAgent(agentId) {
+  document.querySelectorAll('.card').forEach(card => {
+    if (card.dataset.agent === agentId) {
+      card.classList.add('agent-highlight');
+      card.classList.remove('agent-dimmed');
+    } else {
+      card.classList.add('agent-dimmed');
+      card.classList.remove('agent-highlight');
+    }
+  });
+  // Also highlight thread groups
+  document.querySelectorAll('.thread-group').forEach(group => {
+    if (group.dataset.agent === agentId) {
+      group.style.opacity = '1';
+    } else {
+      group.style.opacity = '0.25';
+      group.style.transition = 'opacity 0.3s';
+    }
+  });
+  // Dim inline reply responses that don't match
+  document.querySelectorAll('.inline-reply-response').forEach(resp => {
+    resp.style.opacity = '0.25';
+    resp.style.transition = 'opacity 0.3s';
+  });
+}
+function clearHighlight() {
+  document.querySelectorAll('.card').forEach(card => {
+    card.classList.remove('agent-highlight', 'agent-dimmed');
+  });
+  document.querySelectorAll('.thread-group').forEach(group => {
+    group.style.opacity = '';
+  });
+  document.querySelectorAll('.inline-reply-response').forEach(resp => {
+    resp.style.opacity = '';
+  });
+}
+
+// ── Routing animation ──
+function showRoutingLine(agentId) {
+  const circle = document.querySelector(`.agent-circle.c-${agentId}`);
+  if (!circle || cloudOpen) return;
+
+  // Pulse the agent circle
+  circle.classList.add('route-pulse');
+  setTimeout(() => circle.classList.remove('route-pulse'), 600);
+
+  // Brief flash on the circle
+  const origBoxShadow = circle.style.boxShadow;
+  circle.style.boxShadow = `0 0 20px var(--agent-${agentId})`;
+  setTimeout(() => { circle.style.boxShadow = origBoxShadow; }, 800);
+}
+
+// Trigger routing animation on the last two agent responses after a delay
+setTimeout(() => showRoutingLine('content'), 1500);
+setTimeout(() => showRoutingLine('health'), 2200);
+
+// ── River Depth Indicator ──
+function updateRiverDepth() {
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docHeight > 0 ? Math.min(scrollTop / docHeight, 1) : 0;
+  const depthEl = document.getElementById('riverDepth');
+  const trackH = depthEl.offsetHeight;
+
+  document.getElementById('riverDepthFill').style.height = `${pct * 100}%`;
+  document.getElementById('riverDepthThumb').style.top = `${pct * (trackH - 6)}px`;
+}
+window.addEventListener('scroll', updateRiverDepth, { passive: true });
+updateRiverDepth();
+
+// ── Input Hints ──
+const inputField = document.getElementById('inputField');
+const inputHints = document.getElementById('inputHints');
+let hintsTimer;
+
+function showHints() {
+  if (inputField.value === '') {
+    inputHints.classList.add('visible');
+  }
+}
+function hideHints() {
+  inputHints.classList.remove('visible');
+}
+
+inputField.addEventListener('focus', () => {
+  hintsTimer = setTimeout(showHints, 1200);
+});
+inputField.addEventListener('blur', () => {
+  clearTimeout(hintsTimer);
+  hideHints();
+});
+inputField.addEventListener('input', () => {
+  if (inputField.value !== '') {
+    hideHints();
+  } else {
+    showHints();
+  }
+});
+
+// ── Mock Send ──
+inputField.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && inputField.value.trim()) {
+    const text = inputField.value.trim();
+    inputField.value = '';
+    hideHints();
+
+    // Remove any open inline replies
+    document.querySelectorAll('.inline-reply').forEach(el => el.remove());
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const q = document.createElement('div');
+    q.className = 'card-question';
+    q.textContent = text;
+    card.appendChild(q);
+
+    const ans = document.createElement('div');
+    ans.className = 'card-answer';
+    const p = document.createElement('p');
+    p.textContent = 'Thinking...';
+    p.style.color = 'var(--text-faint)';
+    p.style.fontStyle = 'italic';
+    ans.appendChild(p);
+    card.appendChild(ans);
+
+    card.addEventListener('click', () => card.classList.toggle('collapsed'));
+
+    riverEl.appendChild(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    setTimeout(() => {
+      p.textContent = 'I have noted your request. In a live session, I would route this to the appropriate agent and stream a response here.';
+      p.style.color = '';
+      p.style.fontStyle = '';
+    }, 1500);
+  }
+});
+
+// ── Global Escape to dismiss inline replies ──
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.inline-reply').forEach(el => el.remove());
+  }
+});
+
+// ── Status bar report click ──
+document.getElementById('statusReport').addEventListener('click', () => {
+  // Scroll to the content/geoint card
+  const geointCard = document.querySelector('.card.agent-content');
+  if (geointCard) {
+    geointCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    geointCard.style.background = 'var(--surface-hover)';
+    setTimeout(() => { geointCard.style.background = ''; }, 2000);
+  }
+});
+
+// ── Deactivate agent pulses after a delay ──
+setTimeout(() => {
+  document.querySelectorAll('.agent-circle.active').forEach((c, i) => {
+    setTimeout(() => c.classList.remove('active'), i * 3000 + 5000);
+  });
+}, 4000);
+</script>
+
+</body>
+</html>

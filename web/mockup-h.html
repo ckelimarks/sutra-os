@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra — Breath</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #08080a;
+    --text: #c8c8cc;
+    --text-dim: #5a5a62;
+    --text-faint: #333338;
+    --cursor: #c8c8cc;
+    --agent-lovenotes: #e879a0;
+    --agent-jobsearch: #5cb8e0;
+    --agent-teaching: #4cc9a0;
+    --agent-health: #e8a050;
+    --agent-content: #b08ce0;
+    --agent-geoint: #e06868;
+    --agent-portfolio: #d4b840;
+    --agent-hackathon: #40c8d8;
+    --agent-brandywine: #90c840;
+    --agent-continuum: #7888d0;
+    --agent-sutra: #9080d0;
+    --approve-green: #4cc9a0;
+    --reject-red: #e06868;
+    --warning: #e8a050;
+    --budget-danger: #e06868;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.65;
+    overflow: hidden;
+    cursor: default;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- VOID CONTAINER --- */
+  #void {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background 2s ease;
+  }
+
+  #void.budget-warn {
+    background: radial-gradient(ellipse at top, rgba(232,160,80,0.03) 0%, transparent 60%);
+  }
+
+  #void.budget-danger {
+    background: radial-gradient(ellipse at top, rgba(224,104,104,0.04) 0%, transparent 60%);
+  }
+
+  /* --- BUDGET LINE (top) --- */
+  #budget-line {
+    position: fixed;
+    top: 0; left: 0;
+    height: 1px;
+    background: transparent;
+    transition: width 1.5s ease, background 1.5s ease;
+    z-index: 100;
+    width: 0%;
+  }
+
+  #budget-line.warn {
+    background: var(--warning);
+    opacity: 0.5;
+  }
+
+  #budget-line.danger {
+    background: var(--budget-danger);
+    opacity: 0.7;
+  }
+
+  /* --- CONVERSATION AREA --- */
+  #conversation {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0 24px;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* --- EXCHANGE (user + response pair) --- */
+  .exchange {
+    opacity: 1;
+    transition: opacity 4s ease;
+  }
+
+  .exchange.faded {
+    opacity: 0.15;
+  }
+
+  .exchange.gone {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transition: opacity 1s ease, height 1s ease 1s;
+  }
+
+  .user-input {
+    color: var(--text);
+    margin-bottom: 12px;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+  }
+
+  .user-input::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  .response {
+    padding-left: 16px;
+    position: relative;
+  }
+
+  .response-text {
+    color: var(--text);
+    opacity: 0.85;
+    font-size: 13.5px;
+  }
+
+  .response-text p { margin-bottom: 8px; }
+  .response-text p:last-child { margin-bottom: 0; }
+
+  /* Agent attribution */
+  .attribution {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+
+  .exchange:hover .attribution { opacity: 1; }
+
+  .agent-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .cost-tag {
+    color: var(--text-faint);
+    margin-left: 4px;
+  }
+
+  .model-tag {
+    color: var(--text-faint);
+  }
+
+  .memory-tag {
+    color: var(--agent-continuum);
+    font-style: italic;
+  }
+
+  /* --- CURSOR / INPUT --- */
+  #input-area {
+    width: 100%;
+    max-width: 640px;
+    padding: 0 24px;
+    margin-top: 24px;
+    position: relative;
+    z-index: 10;
+    min-height: 24px;
+  }
+
+  #input-display {
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: 0.01em;
+    outline: none;
+    min-height: 20px;
+    position: relative;
+    display: inline;
+  }
+
+  #cursor {
+    display: inline-block;
+    width: 8px;
+    height: 17px;
+    background: var(--cursor);
+    opacity: 0.7;
+    animation: blink 1.2s ease-in-out infinite;
+    vertical-align: text-bottom;
+    margin-left: 1px;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0; }
+  }
+
+  /* --- HINT TEXT --- */
+  #hint {
+    position: fixed;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-faint);
+    font-size: 11px;
+    opacity: 0.4;
+    transition: opacity 2s ease;
+    text-align: center;
+    line-height: 1.8;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  #hint.hidden { opacity: 0; }
+
+  /* --- BOTTOM BAR --- */
+  #bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 10px;
+    color: var(--text-faint);
+    opacity: 0.3;
+    transition: opacity 0.4s ease;
+    z-index: 50;
+  }
+
+  #bottom-bar:hover { opacity: 0.7; }
+
+  /* --- AGENT OVERLAY --- */
+  #agent-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(8,8,10,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    backdrop-filter: blur(8px);
+  }
+
+  #agent-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 520px;
+  }
+
+  .agent-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.3s ease, border-color 0.3s ease;
+    cursor: default;
+  }
+
+  .agent-card:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+  }
+
+  .agent-card .agent-dot {
+    width: 7px; height: 7px;
+    flex-shrink: 0;
+  }
+
+  .agent-card .agent-dot.working {
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .agent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .agent-name {
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0.8;
+  }
+
+  .agent-status {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .agent-cost-small {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-left: auto;
+  }
+
+  /* --- FILE CHIP --- */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+
+  .file-chip:hover {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+  }
+
+  .file-icon {
+    width: 12px; height: 12px;
+    opacity: 0.5;
+  }
+
+  .file-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .file-chip:hover .file-actions { opacity: 1; }
+
+  .file-btn {
+    font-size: 10px;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 3px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .file-btn:hover {
+    color: var(--text);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  /* --- APPROVAL PROMPT --- */
+  .approval {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.02);
+    border-left: 2px solid var(--agent-lovenotes);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .approval-instruction {
+    margin-bottom: 8px;
+    color: var(--text);
+    opacity: 0.8;
+  }
+
+  .approval-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .approval-btn {
+    font-size: 11px;
+    padding: 4px 14px;
+    border-radius: 3px;
+    border: 1px solid;
+    background: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+  }
+
+  .approval-btn.approve {
+    color: var(--approve-green);
+    border-color: rgba(76,201,160,0.3);
+  }
+
+  .approval-btn.approve:hover {
+    background: rgba(76,201,160,0.1);
+    border-color: rgba(76,201,160,0.5);
+  }
+
+  .approval-btn.reject {
+    color: var(--reject-red);
+    border-color: rgba(224,104,104,0.3);
+  }
+
+  .approval-btn.reject:hover {
+    background: rgba(224,104,104,0.1);
+    border-color: rgba(224,104,104,0.5);
+  }
+
+  /* --- INLINE REPLY --- */
+  .reply-affordance {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 10px;
+    color: var(--text-faint);
+    opacity: 0;
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: opacity 0.3s ease, color 0.2s ease;
+  }
+
+  .exchange:hover .reply-affordance { opacity: 0.6; }
+  .reply-affordance:hover { opacity: 1 !important; color: var(--text-dim); }
+
+  .inline-reply {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transition: opacity 0.3s ease, height 0.3s ease;
+  }
+
+  .inline-reply.open {
+    opacity: 1;
+    height: 28px;
+  }
+
+  .inline-reply-target {
+    font-size: 10px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+
+  .inline-reply-input {
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    flex: 1;
+    padding: 2px 0;
+  }
+
+  .inline-reply-input:focus {
+    border-bottom-color: rgba(255,255,255,0.2);
+  }
+
+  /* --- REPORT ZOOM --- */
+  .report-zoom {
+    margin-top: 6px;
+  }
+
+  .zoom-toggle {
+    font-size: 10px;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 2px 0;
+    display: inline-block;
+    transition: color 0.2s;
+  }
+
+  .zoom-toggle:hover { color: var(--text-dim); }
+
+  .zoom-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, opacity 0.3s ease;
+    opacity: 0;
+  }
+
+  .zoom-content.open {
+    max-height: 500px;
+    opacity: 1;
+  }
+
+  .zoom-level {
+    padding: 6px 0 4px 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    border-top: 1px solid rgba(255,255,255,0.03);
+    margin-top: 4px;
+  }
+
+  .zoom-level p { margin-bottom: 4px; }
+
+  /* --- STATUS SYNTHESIS --- */
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 20px;
+    margin: 8px 0;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    padding: 3px 0;
+  }
+
+  .status-item .agent-dot {
+    flex-shrink: 0;
+    position: relative;
+    top: -1px;
+  }
+
+  .status-label {
+    color: var(--text-dim);
+    min-width: 70px;
+  }
+
+  .status-value {
+    color: var(--text);
+    opacity: 0.75;
+    font-size: 12px;
+  }
+
+  /* --- SCROLL --- */
+  #scroll-container {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 40px;
+    padding-top: 40px;
+    scrollbar-width: none;
+  }
+
+  #scroll-container::-webkit-scrollbar { display: none; }
+
+  /* Typewriter */
+  .typewriter { overflow: hidden; }
+
+  /* --- GUIDE (shown on ?) --- */
+  #guide-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(8,8,10,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    backdrop-filter: blur(12px);
+  }
+
+  #guide-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .guide-content {
+    max-width: 500px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 2;
+  }
+
+  .guide-content h2 {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text);
+    opacity: 0.7;
+    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .guide-row {
+    display: flex;
+    gap: 16px;
+    align-items: baseline;
+  }
+
+  .guide-key {
+    color: var(--text-faint);
+    min-width: 200px;
+    font-size: 11px;
+  }
+
+  .guide-desc {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="void">
+  <div id="budget-line"></div>
+
+  <div id="scroll-container">
+    <div id="conversation"></div>
+    <div id="input-area">
+      <span id="input-display"></span><span id="cursor"></span>
+    </div>
+  </div>
+
+  <div id="hint">
+    type a command to begin<br>
+    press ? for all scenarios
+  </div>
+
+  <div id="bottom-bar">
+    <span id="bar-agents">9 agents</span>
+    <span id="bar-cost">$0.00 today</span>
+  </div>
+</div>
+
+<!-- Agent Overlay -->
+<div id="agent-overlay">
+  <div class="agent-grid" id="agent-grid"></div>
+</div>
+
+<!-- Guide Overlay -->
+<div id="guide-overlay">
+  <div class="guide-content">
+    <h2>Scenarios</h2>
+    <div class="guide-row"><span class="guide-key">check lovenotes health</span><span class="guide-desc">natural language dispatch</span></div>
+    <div class="guide-row"><span class="guide-key">status</span><span class="guide-desc">multi-agent synthesis</span></div>
+    <div class="guide-row"><span class="guide-key">what's the weather</span><span class="guide-desc">cheap model routing (haiku)</span></div>
+    <div class="guide-row"><span class="guide-key">design the onboarding flow</span><span class="guide-desc">complex model routing (opus)</span></div>
+    <div class="guide-row"><span class="guide-key">write interview prep</span><span class="guide-desc">file creation</span></div>
+    <div class="guide-row"><span class="guide-key">send anniversary sms</span><span class="guide-desc">supervised approval</span></div>
+    <div class="guide-row"><span class="guide-key">what did I work on last tuesday</span><span class="guide-desc">memory retrieval</span></div>
+    <div class="guide-row"><span class="guide-key">lovenotes report</span><span class="guide-desc">report with zoom levels</span></div>
+    <div class="guide-row"><span class="guide-key">budget</span><span class="guide-desc">budget alert</span></div>
+    <div class="guide-row" style="margin-top:12px; border-top: 1px solid rgba(255,255,255,0.04); padding-top:12px;">
+      <span class="guide-key">Tab</span><span class="guide-desc">agent overlay</span></div>
+    <div class="guide-row"><span class="guide-key">Escape</span><span class="guide-desc">dismiss overlays</span></div>
+    <div class="guide-row"><span class="guide-key">hover a response</span><span class="guide-desc">reply to specific agent</span></div>
+    <div class="guide-row"><span class="guide-key">?</span><span class="guide-desc">this guide</span></div>
+  </div>
+</div>
+
+<script>
+const AGENTS = [
+  { name: 'lovenotes', color: 'var(--agent-lovenotes)', status: 'idle', cost: '$0.12' },
+  { name: 'job-search', color: 'var(--agent-jobsearch)', status: 'working', cost: '$0.08' },
+  { name: 'teaching', color: 'var(--agent-teaching)', status: 'idle', cost: '$0.03' },
+  { name: 'health', color: 'var(--agent-health)', status: 'idle', cost: '$0.01' },
+  { name: 'content', color: 'var(--agent-content)', status: 'idle', cost: '$0.05' },
+  { name: 'geoint', color: 'var(--agent-geoint)', status: 'working', cost: '$0.14' },
+  { name: 'portfolio', color: 'var(--agent-portfolio)', status: 'idle', cost: '$0.02' },
+  { name: 'hackathon', color: 'var(--agent-hackathon)', status: 'idle', cost: '$0.00' },
+  { name: 'continuum', color: 'var(--agent-continuum)', status: 'idle', cost: '$0.04' },
+];
+
+let totalCost = 0.49;
+let inputText = '';
+let hintDismissed = false;
+let guideVisible = false;
+let agentOverlayVisible = false;
+let exchanges = [];
+
+// --- Build agent overlay ---
+function buildAgentGrid() {
+  const grid = document.getElementById('agent-grid');
+  grid.innerHTML = AGENTS.map(a => `
+    <div class="agent-card">
+      <span class="agent-dot ${a.status === 'working' ? 'working' : ''}" style="background:${a.color}"></span>
+      <div class="agent-info">
+        <span class="agent-name">${a.name}</span>
+        <span class="agent-status">${a.status}</span>
+      </div>
+      <span class="agent-cost-small">${a.cost}</span>
+    </div>
+  `).join('');
+}
+buildAgentGrid();
+
+// --- Input handling ---
+const inputDisplay = document.getElementById('input-display');
+const conversation = document.getElementById('conversation');
+const hint = document.getElementById('hint');
+
+document.addEventListener('keydown', (e) => {
+  // Guide toggle
+  if (e.key === '?' && inputText === '') {
+    e.preventDefault();
+    guideVisible = !guideVisible;
+    document.getElementById('guide-overlay').classList.toggle('visible', guideVisible);
+    return;
+  }
+
+  // Dismiss overlays
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    guideVisible = false;
+    agentOverlayVisible = false;
+    document.getElementById('guide-overlay').classList.remove('visible');
+    document.getElementById('agent-overlay').classList.remove('visible');
+    // Close inline replies
+    document.querySelectorAll('.inline-reply.open').forEach(r => r.classList.remove('open'));
+    return;
+  }
+
+  // Agent overlay
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (guideVisible) return;
+    agentOverlayVisible = !agentOverlayVisible;
+    document.getElementById('agent-overlay').classList.toggle('visible', agentOverlayVisible);
+    return;
+  }
+
+  // If overlays open, ignore typing
+  if (guideVisible || agentOverlayVisible) return;
+
+  // If inline reply input focused, ignore
+  if (document.activeElement && document.activeElement.classList.contains('inline-reply-input')) return;
+
+  if (e.key === 'Enter' && inputText.trim()) {
+    e.preventDefault();
+    submitInput();
+    return;
+  }
+
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    inputText = inputText.slice(0, -1);
+    renderInput();
+    return;
+  }
+
+  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault();
+    if (!hintDismissed) {
+      hintDismissed = true;
+      hint.classList.add('hidden');
+    }
+    inputText += e.key;
+    renderInput();
+  }
+});
+
+function renderInput() {
+  inputDisplay.textContent = inputText;
+}
+
+function submitInput() {
+  const text = inputText.trim().toLowerCase();
+  inputText = '';
+  renderInput();
+  processCommand(text);
+}
+
+function updateCost(add) {
+  totalCost += add;
+  document.getElementById('bar-cost').textContent = `$${totalCost.toFixed(2)} today`;
+}
+
+// --- Fade old exchanges ---
+function fadeOldExchanges() {
+  const els = document.querySelectorAll('.exchange:not(.faded)');
+  els.forEach((el, i) => {
+    if (i < els.length - 2) {
+      setTimeout(() => el.classList.add('faded'), 10000);
+    }
+  });
+}
+
+// --- Create exchange ---
+function addExchange(userText, responseHTML, agentName, agentColor, extra = {}) {
+  const ex = document.createElement('div');
+  ex.className = 'exchange';
+
+  let attributionHTML = '';
+  if (agentName) {
+    attributionHTML = `<div class="attribution">
+      <span class="agent-dot" style="background:${agentColor}"></span>
+      <span>${agentName}</span>`;
+    if (extra.model) attributionHTML += `<span class="model-tag">${extra.model}</span>`;
+    if (extra.cost) attributionHTML += `<span class="cost-tag">${extra.cost}</span>`;
+    if (extra.memory) attributionHTML += `<span class="memory-tag">retrieved from ${extra.memory}</span>`;
+    attributionHTML += `</div>`;
+  }
+
+  let extraHTML = '';
+  if (extra.file) {
+    extraHTML += `<div class="file-chip">
+      <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span>${extra.file}</span>
+      <div class="file-actions">
+        <button class="file-btn" onclick="event.stopPropagation()">open</button>
+        <button class="file-btn" onclick="event.stopPropagation()">reveal</button>
+      </div>
+    </div>`;
+  }
+
+  if (extra.approval) {
+    extraHTML += `<div class="approval">
+      <div class="approval-instruction">${extra.approval.instruction}</div>
+      <div class="approval-actions">
+        <button class="approval-btn approve" onclick="handleApproval(this, true)">Approve</button>
+        <button class="approval-btn reject" onclick="handleApproval(this, false)">Reject</button>
+      </div>
+    </div>`;
+  }
+
+  if (extra.zoom) {
+    extraHTML += `<div class="report-zoom">
+      <span class="zoom-toggle" onclick="toggleZoom(this, 'vritti')">more</span>
+      <div class="zoom-content" data-level="vritti">
+        <div class="zoom-level">${extra.zoom.vritti}</div>
+        <span class="zoom-toggle" onclick="toggleZoom(this, 'bhashya')">full details</span>
+        <div class="zoom-content" data-level="bhashya">
+          <div class="zoom-level">${extra.zoom.bhashya}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const replyAgentName = agentName || 'sutra';
+  const replyAgentColor = agentColor || 'var(--agent-sutra)';
+
+  ex.innerHTML = `
+    <div class="user-input">${userText}</div>
+    <div class="response">
+      <span class="reply-affordance" onclick="openReply(this, '${replyAgentName}')">reply</span>
+      <div class="response-text">${responseHTML}</div>
+      ${attributionHTML}
+      ${extraHTML}
+      <div class="inline-reply">
+        <span class="inline-reply-target" style="color:${replyAgentColor}">to ${replyAgentName}:</span>
+        <input class="inline-reply-input" placeholder="..." onkeydown="if(event.key==='Enter'){this.parentElement.classList.remove('open');event.stopPropagation();}">
+      </div>
+    </div>
+  `;
+
+  conversation.appendChild(ex);
+  exchanges.push(ex);
+
+  // Scroll to bottom
+  const sc = document.getElementById('scroll-container');
+  sc.scrollTop = sc.scrollHeight;
+
+  fadeOldExchanges();
+}
+
+function openReply(el, agentName) {
+  const reply = el.closest('.response').querySelector('.inline-reply');
+  reply.classList.toggle('open');
+  if (reply.classList.contains('open')) {
+    reply.querySelector('input').focus();
+  }
+}
+
+function handleApproval(btn, approved) {
+  const container = btn.closest('.approval');
+  if (approved) {
+    container.innerHTML = `<div style="color:var(--approve-green);font-size:12px;opacity:0.7">approved. sending.</div>`;
+  } else {
+    container.innerHTML = `<div style="color:var(--reject-red);font-size:12px;opacity:0.7">rejected.</div>`;
+  }
+}
+
+function toggleZoom(el, level) {
+  const content = el.nextElementSibling;
+  if (!content) return;
+  content.classList.toggle('open');
+  if (content.classList.contains('open')) {
+    el.textContent = level === 'vritti' ? 'less' : 'collapse';
+  } else {
+    el.textContent = level === 'vritti' ? 'more' : 'full details';
+  }
+}
+
+// --- Scenario routing ---
+function processCommand(text) {
+  // 1. Natural language dispatch
+  if (text.includes('lovenotes health') || text.includes('check lovenotes')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>11 couples active, 5 paid. 2 stale responses (couple #7 last active 3 days ago, couple #11 last active 5 days). SMS delivery rate 98.2%. No failed webhooks in 48h.</p>
+        <p>0 trial conversions this week. Engagement clustering: 6 couples in "daily active", 3 in "every other day", 2 in "at risk".</p>`,
+        'lovenotes', 'var(--agent-lovenotes)', { model: 'sonnet', cost: '$0.008' }
+      );
+      updateCost(0.008);
+    }, 600);
+    return;
+  }
+
+  // 2. Status synthesis
+  if (text === 'status') {
+    setTimeout(() => {
+      addExchange(text,
+        `<div class="status-grid">
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-lovenotes)"></span><span class="status-label">lovenotes</span><span class="status-value">11 couples, 2 at risk</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-jobsearch)"></span><span class="status-label">job-search</span><span class="status-value">2 final rounds this week</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-teaching)"></span><span class="status-label">teaching</span><span class="status-value">315 students, grades due Fri</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-health)"></span><span class="status-label">health</span><span class="status-value">3 workouts this week</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-content)"></span><span class="status-label">content</span><span class="status-value">draft ready for review</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-geoint)"></span><span class="status-label">geoint</span><span class="status-value">hotspot tracking updated</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-portfolio)"></span><span class="status-label">portfolio</span><span class="status-value">3 case studies live</span></div>
+          <div class="status-item"><span class="agent-dot" style="background:var(--agent-hackathon)"></span><span class="status-label">hackathon</span><span class="status-value">mission match demo ready</span></div>
+        </div>
+        <p style="margin-top:6px;font-size:12px;color:var(--text-dim)">2 agents working, 7 idle. $0.49 spent today.</p>`,
+        'sutra', 'var(--agent-sutra)', { model: 'sonnet', cost: '$0.012' }
+      );
+      updateCost(0.012);
+    }, 800);
+    return;
+  }
+
+  // 3a. Cheap routing
+  if (text.includes('weather') || text.includes('time') || text.includes('date today')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>72F, partly cloudy. High of 78. No rain expected.</p>`,
+        'sutra', 'var(--agent-sutra)', { model: 'haiku', cost: '$0.001' }
+      );
+      updateCost(0.001);
+    }, 300);
+    return;
+  }
+
+  // 3b. Expensive routing
+  if (text.includes('design') || text.includes('architect') || text.includes('onboarding flow')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>The onboarding flow should be three screens max. Screen 1: name + partner's name. Screen 2: choose frequency (daily/every other day). Screen 3: first prompt preview with send button. No account creation friction at this point -- defer to after first exchange.</p>
+        <p>Key insight: the couple that converted came through the shortest path. Every additional screen is a drop-off multiplier. Optimize for first-exchange-sent, not profile-completed.</p>`,
+        'sutra', 'var(--agent-sutra)', { model: 'opus', cost: '$0.042' }
+      );
+      updateCost(0.042);
+    }, 1200);
+    return;
+  }
+
+  // 4. File creation
+  if (text.includes('write') && text.includes('interview')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>Created interview prep document. Covers behavioral questions mapped to your experience, system design talking points, and the STAR stories you've used successfully before.</p>`,
+        'job-search', 'var(--agent-jobsearch)', { model: 'sonnet', cost: '$0.018', file: 'interview-prep-2026-04-08.md' }
+      );
+      updateCost(0.018);
+    }, 900);
+    return;
+  }
+
+  // 5. Supervised approval
+  if (text.includes('send') && (text.includes('sms') || text.includes('anniversary'))) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>Composed anniversary message for couple #3 (Sarah & Michael). Ready to send via Twilio.</p>`,
+        'lovenotes', 'var(--agent-lovenotes)', {
+          model: 'sonnet', cost: '$0.006',
+          approval: {
+            instruction: 'LoveNotes wants to send SMS to +1***4821: "Happy 2-year anniversary, Sarah & Michael. Here\'s a reflection prompt just for today..."'
+          }
+        }
+      );
+      updateCost(0.006);
+    }, 700);
+    return;
+  }
+
+  // 8. Memory retrieval
+  if (text.includes('last tuesday') || text.includes('what did i work on') || text.includes('last week')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>Last Tuesday (Apr 1): focused on geoint briefing and sutra orchestrator design. Shipped hotspot tracking update, wrote 3 sections of the sutra PRD, and had a 30-min coaching call. Energy was medium. You noted "sequencing matters more than speed" in your reflections.</p>`,
+        'continuum', 'var(--agent-continuum)', { model: 'sonnet', cost: '$0.014', memory: '2026-04-01' }
+      );
+      updateCost(0.014);
+    }, 1000);
+    return;
+  }
+
+  // 9. Report zoom
+  if (text.includes('lovenotes report') || text.includes('report')) {
+    setTimeout(() => {
+      addExchange(text,
+        `<p>LoveNotes: stable. 11 couples, 98% delivery, 0 conversions this period.</p>`,
+        'lovenotes', 'var(--agent-lovenotes)', {
+          model: 'sonnet', cost: '$0.010',
+          zoom: {
+            vritti: `<p>Engagement breakdown: 6 daily active, 3 every-other-day, 2 at risk (couples #7 and #11). Couple #7 hasn't responded in 3 days -- historically they re-engage after 4 days. Couple #11 is new and may be churning.</p>
+            <p>Revenue: $49.95 MRR from 5 paid couples. Churn risk: low for paid, moderate for trial.</p>`,
+            bhashya: `<p>Full delivery log: 847 SMS sent this month, 831 delivered (98.1%), 16 pending, 0 failed. Twilio SID range: SM3a...SM3f. No webhook errors.</p>
+            <p>Curriculum position: 4 couples on v4.1 (appreciation), 2 on v4 (original), 5 on v4.1-lite. A/B test inconclusive at current sample size.</p>
+            <p>Infrastructure: Supabase healthy, 23ms avg response. Cron jobs all green. Last migration: 2026-03-28 (added partner_b_timezone column).</p>
+            <p>Recommendation: run user interviews with couples #7 and #11 before making curriculum changes. Current data is insufficient to validate the "hard mode" hypothesis.</p>`
+          }
+        }
+      );
+      updateCost(0.010);
+    }, 800);
+    return;
+  }
+
+  // 10. Budget alert
+  if (text === 'budget') {
+    const budgetLine = document.getElementById('budget-line');
+    const void_ = document.getElementById('void');
+
+    // Phase 1: warning
+    setTimeout(() => {
+      totalCost = 3.80;
+      document.getElementById('bar-cost').textContent = `$3.80 today`;
+      budgetLine.style.width = '76%';
+      budgetLine.classList.add('warn');
+      void_.classList.add('budget-warn');
+
+      addExchange(text,
+        `<p>Daily budget: $5.00. Spent: $3.80 (76%). At current rate, limit reached by 4pm.</p>
+        <p style="color:var(--warning);opacity:0.7;font-size:12px;margin-top:4px">Routing bias shifted: preferring haiku/sonnet where possible.</p>`,
+        'sutra', 'var(--agent-sutra)', { model: 'haiku', cost: '$0.001' }
+      );
+    }, 500);
+
+    // Phase 2: danger (after delay)
+    setTimeout(() => {
+      totalCost = 4.60;
+      document.getElementById('bar-cost').textContent = `$4.60 today`;
+      budgetLine.style.width = '92%';
+      budgetLine.classList.remove('warn');
+      budgetLine.classList.add('danger');
+      void_.classList.remove('budget-warn');
+      void_.classList.add('budget-danger');
+    }, 5000);
+
+    return;
+  }
+
+  // Default fallback
+  setTimeout(() => {
+    addExchange(text,
+      `<p>Acknowledged. No specific agent matched -- processed directly.</p>`,
+      'sutra', 'var(--agent-sutra)', { model: 'haiku', cost: '$0.001' }
+    );
+    updateCost(0.001);
+  }, 400);
+}
+</script>
+
+</body>
+</html>

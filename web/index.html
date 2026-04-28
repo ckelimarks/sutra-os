@@ -19,11 +19,11 @@
     --sutra-glow: rgba(139, 92, 246, 0.45);
 
     /* Warm palette — muted icon-tile style */
-    --c-rose: #d16b9e;    /* rose */
+    --c-lovenotes: #d16b9e;    /* rose */
     --c-content: #5a95d6;      /* sky */
-    --c-cyan: #d97e4e;       /* rust orange */
+    --c-geoint: #d97e4e;       /* rust orange */
     --c-coder: #5db3b3;        /* teal */
-    --c-amber: #b8864a;   /* warm amber */
+    --c-brandywine: #b8864a;   /* warm amber */
     --c-designer: #a78bfa;     /* soft violet */
     --c-helper: #6b6b78;       /* neutral gray — utility */
 
@@ -53,8 +53,11 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* mobile: account for dynamic URL bar */
     position: relative;
   }
+  /* Hide timeline-only chrome when chat view is active */
+  body.view-chat .toolbar { display: none !important; }
 
   /* ---------- HEADER ---------- */
   header {
@@ -1032,6 +1035,9 @@
   .show-subagents .subagent-track {
     display: block;
   }
+  .show-subagents .lane-track {
+    overflow: visible; /* track is positioned 14px below — must not clip */
+  }
   .show-subagents .lane {
     margin-bottom: calc(var(--row-gap) + 14px); /* extra space for sub-track */
   }
@@ -1069,11 +1075,11 @@
   }
 
   /* Agent color classes */
-  .bg-rose { background: var(--c-rose); }
+  .bg-lovenotes { background: var(--c-lovenotes); }
   .bg-content   { background: var(--c-content); }
-  .bg-cyan    { background: var(--c-cyan); }
+  .bg-geoint    { background: var(--c-geoint); }
   .bg-coder     { background: var(--c-coder); }
-  .bg-amber{ background: var(--c-amber); }
+  .bg-brandywine{ background: var(--c-brandywine); }
   .bg-designer  { background: var(--c-designer); }
   .bg-helper    { background: var(--c-helper); }
   .bg-sutra     {
@@ -1086,17 +1092,17 @@
   .block.sutra-block .tool-subtitle { color: rgba(255,255,255,0.65); }
   .block.sutra-block.active .duration { color: rgba(255,255,255,0.9); }
 
-  .block.paused.bg-cyan::before { background: var(--c-cyan); }
-  .block.paused.bg-rose::before { background: var(--c-rose); }
+  .block.paused.bg-geoint::before { background: var(--c-geoint); }
+  .block.paused.bg-lovenotes::before { background: var(--c-lovenotes); }
   .block.queued.bg-coder::before { background: var(--c-coder); }
   .block.queued.bg-content::before { background: var(--c-content); }
-  .block.queued.bg-amber::before { background: var(--c-amber); }
+  .block.queued.bg-brandywine::before { background: var(--c-brandywine); }
 
-  .swatch-rose { background: var(--c-rose); }
+  .swatch-lovenotes { background: var(--c-lovenotes); }
   .swatch-content   { background: var(--c-content); }
-  .swatch-cyan    { background: var(--c-cyan); }
+  .swatch-geoint    { background: var(--c-geoint); }
   .swatch-coder     { background: var(--c-coder); }
-  .swatch-amber{ background: var(--c-amber); }
+  .swatch-brandywine{ background: var(--c-brandywine); }
   .swatch-designer  { background: var(--c-designer); }
   .swatch-helper    { background: var(--c-helper); }
 
@@ -2185,11 +2191,11 @@
     --text-faint: #9b9790;
     --sutra: #7c3aed;
     --sutra-glow: rgba(124, 58, 237, 0.2);
-    --c-rose: #b87070;
+    --c-lovenotes: #b87070;
     --c-content: #5f88a8;
-    --c-cyan: #b8884a;
+    --c-geoint: #b8884a;
     --c-coder: #4a9478;
-    --c-amber: #a88040;
+    --c-brandywine: #a88040;
     --c-designer: #8870b0;
     --c-helper: #7a7a70;
   }
@@ -2269,11 +2275,11 @@
   }
   body.light-mode .lane-label:hover { background: rgba(0,0,0,0.03); }
   /* Blocks — softer, pastel-ish versions */
-  body.light-mode .bg-rose { background: #d4908f; }
+  body.light-mode .bg-lovenotes { background: #d4908f; }
   body.light-mode .bg-content   { background: #7fa0b8; }
-  body.light-mode .bg-cyan    { background: #cc9e5c; }
+  body.light-mode .bg-geoint    { background: #cc9e5c; }
   body.light-mode .bg-coder     { background: #6faa94; }
-  body.light-mode .bg-amber{ background: #c09660; }
+  body.light-mode .bg-brandywine{ background: #c09660; }
   body.light-mode .bg-designer  { background: #a088c4; }
   body.light-mode .bg-helper    { background: #9a9a90; }
   body.light-mode .bg-sutra     { background: #a088c4; }
@@ -2321,11 +2327,11 @@
   body.light-mode .attention-pill { background: #eae7e2; border-color: #d5d0c8; color: #6b6862; }
   body.light-mode .attention-pill:hover { background: #e2dfd9; color: #2c2a26; }
   /* Agent swatch colors for light mode */
-  body.light-mode .swatch-rose { background: var(--c-rose); }
+  body.light-mode .swatch-lovenotes { background: var(--c-lovenotes); }
   body.light-mode .swatch-content   { background: var(--c-content); }
-  body.light-mode .swatch-cyan    { background: var(--c-cyan); }
+  body.light-mode .swatch-geoint    { background: var(--c-geoint); }
   body.light-mode .swatch-coder     { background: var(--c-coder); }
-  body.light-mode .swatch-amber{ background: var(--c-amber); }
+  body.light-mode .swatch-brandywine{ background: var(--c-brandywine); }
   body.light-mode .swatch-designer  { background: var(--c-designer); }
   body.light-mode .swatch-helper    { background: var(--c-helper); }
   /* Input target menu */
@@ -2372,6 +2378,131 @@
   .theme-toggle .icon-moon { display: block; }
   body.light-mode .theme-toggle .icon-sun { display: block; }
   body.light-mode .theme-toggle .icon-moon { display: none; }
+
+  /* ---------- MOBILE TOGGLES (chat view) ---------- */
+  .chat-mobile-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    padding: 0 10px;
+    margin: 14px 0 0 0;
+    background: transparent;
+    border: none;
+    flex: 0 0 32px;
+    z-index: 5;
+    box-sizing: border-box;
+  }
+  .chat-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 8px;
+    margin: 0;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+  .chat-mobile-toggle:active { background: var(--bg-elev-2); color: var(--text); }
+  .chat-mobile-toggle svg { width: 12px; height: 12px; flex-shrink: 0; }
+  .mobile-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 30;
+  }
+  .mobile-backdrop.show { display: block; }
+
+  /* ---------- RESPONSIVE: phones / narrow viewports ---------- */
+  @media (max-width: 768px) {
+    /* Show mobile toggle bar in chat view */
+    #chatView .chat-mobile-bar { display: flex; }
+
+    /* Stack chat: thread fills, sidebar/detail slide in over it */
+    #chatView > div:not(.chat-mobile-bar) {
+      position: relative;
+      padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+      padding-top: 0 !important;
+    }
+    #chatThread { padding-top: 4px !important; }
+    #chatSidebar {
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      width: 78vw;
+      max-width: 320px;
+      min-width: 0 !important;
+      transform: translateX(-100%);
+      transition: transform 0.22s ease-out;
+      z-index: 35;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.4);
+    }
+    #chatSidebar.mobile-open { transform: translateX(0); }
+    #chatDetail {
+      position: absolute;
+      top: 0; bottom: 0; right: 0;
+      width: 82vw;
+      max-width: 360px;
+      min-width: 0 !important;
+      transform: translateX(100%);
+      transition: transform 0.22s ease-out;
+      z-index: 35;
+      box-shadow: -2px 0 12px rgba(0,0,0,0.4);
+      border-left: 1px solid var(--border);
+    }
+    #chatDetail.mobile-open { transform: translateX(0); }
+    #chatThread {
+      padding: 12px 14px !important;
+      width: 100%;
+    }
+
+    /* Input bar — fill width with safe gutters + iOS home-indicator safe area */
+    .bottom > div[style*="max-width:780px"],
+    .bottom > div:last-child {
+      max-width: 100% !important;
+      padding: 0 10px calc(12px + env(safe-area-inset-bottom)) !important;
+      box-sizing: border-box;
+    }
+    .input-bar {
+      gap: 8px;
+      padding: 10px 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .input-bar input {
+      font-size: 16px; /* prevents iOS zoom on focus */
+    }
+    .input-bar .send-hint { display: none; }
+    .input-target { padding: 4px 8px; font-size: 11px; }
+
+    /* Drawer — full width on mobile */
+    .session-drawer { left: 0 !important; right: 0 !important; width: 100% !important; }
+    .drawer-tabs { gap: 2px; }
+    .drawer-tab { padding: 4px 8px !important; font-size: 10px !important; }
+
+    /* Header — single row, smaller padding, hide brand subtitle to save space */
+    header { padding: 8px 10px !important; gap: 8px !important; flex-wrap: nowrap !important; }
+    header .brand-sub { display: none; }
+    header .brand-name { font-size: 13px !important; }
+    .view-switch a { padding: 4px 8px !important; font-size: 12px !important; }
+    .header-right { gap: 8px !important; }
+
+    /* Timeline view — keep but allow horizontal scroll on its own */
+    .timeline-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Hide New Agent button on mobile — Sutra dispatches */
+    #newAgentBtn { display: none !important; }
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
@@ -2416,7 +2547,7 @@
       <div class="att-item" data-agent="geoint">
         <span class="att-dot att-red"></span>
         <div class="att-item-body">
-          <div class="att-item-title">VirtualAdmin · Region classification review</div>
+          <div class="att-item-title">GEOINT · Region classification review</div>
           <div class="att-item-sub">Paused — awaiting permission to edit classification file</div>
         </div>
         <button class="att-action" onclick="event.stopPropagation();">Approve edit</button>
@@ -2524,8 +2655,19 @@
   </div>
 
   <!-- CHAT VIEW — sidebar + thread + detail panel -->
-  <div id="chatView" style="display:none;flex:1;overflow:hidden;">
-    <div style="display:flex;height:100%;padding-bottom:70px;">
+  <div id="chatView" style="display:none;flex:1;overflow:hidden;flex-direction:column;">
+    <!-- Mobile-only toggle bar (hidden on desktop via CSS) -->
+    <div class="chat-mobile-bar">
+      <button class="chat-mobile-toggle" onclick="toggleChatPanel('sidebar')" aria-label="Open agents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        Agents
+      </button>
+      <button class="chat-mobile-toggle" onclick="toggleChatPanel('detail')" aria-label="Open info">
+        Info
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;padding-bottom:70px;flex:1;min-height:0;">
       <!-- Left: Agent list -->
       <div id="chatSidebar" style="width:220px;min-width:220px;background:var(--bg-elev);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;"></div>
       <!-- Center: Thread -->
@@ -2540,6 +2682,7 @@
         <div id="chatDetailContent" style="flex:1;overflow-y:auto;padding:8px 10px;"></div>
       </div>
     </div>
+    <div class="mobile-backdrop" id="chatMobileBackdrop" onclick="closeChatPanels()"></div>
   </div>
 
   <!-- TASK POPUP — appears above chat bar -->
@@ -2580,12 +2723,12 @@
       </div>
     </div>
     <div class="status-card-body">
-      <div class="status-line"><span class="sl-name" style="color:var(--c-rose);">CPA</span> — 5 paid couples active, 2 stale response chains (Marcus &amp; Tia, Devon &amp; Priya)</div>
-      <div class="status-line"><span class="sl-name" style="color:var(--c-cyan);">VirtualAdmin</span> — briefing ready, 1 classification review <b style="color:#ef4444;">needs your input</b></div>
+      <div class="status-line"><span class="sl-name" style="color:var(--c-lovenotes);">LoveNotes</span> — 5 paid couples active, 2 stale response chains (Marcus &amp; Tia, Devon &amp; Priya)</div>
+      <div class="status-line"><span class="sl-name" style="color:var(--c-geoint);">GEOINT</span> — briefing ready, 1 classification review <b style="color:#ef4444;">needs your input</b></div>
       <div class="status-line"><span class="sl-name" style="color:var(--c-content);">ContentWriter</span> — post 1 drafted (312 words, <b style="color:#eab308;">needs review</b>), post 2 active (67%), post 3 queued</div>
       <div class="status-line"><span class="sl-name" style="color:var(--c-coder);">Coder</span> — router refactored, wiring bridge now · <b style="color:#ef4444;">context 91% — nearing compaction</b></div>
-      <div class="status-line"><span class="sl-name" style="color:var(--c-amber);">Legal</span> — 2025 financials extracted ($8.7M, 80.7% occ), UPREIT analysis active (blocked on LLC doc)</div>
-      <div class="status-line"><span class="sl-name" style="color:var(--c-designer);">Designer</span> — EmbedChart.tsx shipped for Christine, app running on :3030</div>
+      <div class="status-line"><span class="sl-name" style="color:var(--c-brandywine);">Brandywine</span> — 2025 financials extracted ($8.7M, 80.7% occ), UPREIT analysis active (blocked on LLC doc)</div>
+      <div class="status-line"><span class="sl-name" style="color:var(--c-designer);">VedicChart</span> — EmbedChart.tsx shipped for Christine, app running on :3030</div>
       <div class="status-line"><span class="sl-name" style="color:var(--c-helper);">Scratch · Runner</span> — utility agents idle, ready for ad-hoc</div>
     </div>
     <div class="status-card-footer">
@@ -2768,7 +2911,7 @@ function fmtDur(m) {
 
 
 // Color palette cycling
-const COLOR_PALETTE = ['rose', 'content', 'cyan', 'coder', 'amber', 'designer'];
+const COLOR_PALETTE = ['lovenotes', 'content', 'geoint', 'coder', 'brandywine', 'designer'];
 
 // Default icon mapping — can be overridden per agent
 const EMOJI_TO_ICON = {
@@ -3571,14 +3714,14 @@ function getAgentIcon(name) {
   // Known mappings
   const known = {
     'Sutra': 'terminal',
-    'CPA': 'heart',
+    'LoveNotes': 'heart',
     'ContentWriter': 'feather',
-    'VirtualAdmin': 'globe',
-    'VirtualAdmin': 'globe',
+    'GEOINT': 'globe',
+    'GeointTest': 'globe',
     'Coder': 'code',
-    'Legal': 'mountain',
-    'VirtualAdmin': 'hexagon',
-    'Marketing': 'target',
+    'Brandywine': 'mountain',
+    'Mudra': 'hexagon',
+    'HG-POV': 'target',
   };
   if (known[name]) return known[name];
   // Hash the name to pick from pool
@@ -3762,20 +3905,20 @@ function fromLabel(m, agent) {
   if (m.role === 'assistant') {
     return `${agentChip(agent.name, agent.color)}`;
   }
-  return `<span style="color: var(--text);">the user</span>`;
+  return `<span style="color: var(--text);">Christopher</span>`;
 }
 function fromLabelRiver(m) {
   if (m.role === 'assistant') {
     return `${agentChip(m._agentName || 'Agent', m._agentColor || 'helper')}`;
   }
-  return `<span style="color: var(--text);">the user</span>`;
+  return `<span style="color: var(--text);">Christopher</span>`;
 }
 
 // Highlight agent names in message content
 const agentColorMap = {
-  'Sutra': 'sutra', 'CPA': 'rose', 'ContentWriter': 'content',
-  'VirtualAdmin': 'geoint', 'VirtualAdmin': 'geoint', 'Coder': 'coder',
-  'Legal': 'amber', 'Designer': 'designer', 'Marketing': 'rose',
+  'Sutra': 'sutra', 'LoveNotes': 'lovenotes', 'ContentWriter': 'content',
+  'GEOINT': 'geoint', 'GeointTest': 'geoint', 'Coder': 'coder',
+  'Brandywine': 'brandywine', 'VedicChart': 'designer', 'Mudra': 'designer',
   'Scratch': 'helper', 'Runner': 'helper',
 };
 function colorAgentNames(html) {
@@ -4473,6 +4616,13 @@ document.addEventListener('keydown', (e) => {
       hideResetModal();
       return;
     }
+    // 0a. Close mobile chat panels if any are open
+    const sidebar = document.getElementById('chatSidebar');
+    const detail = document.getElementById('chatDetail');
+    if ((sidebar && sidebar.classList.contains('mobile-open')) || (detail && detail.classList.contains('mobile-open'))) {
+      closeChatPanels();
+      return;
+    }
     // 1. If there's a known in-flight dispatch from this page, cancel it
     if (_lastDispatchAgentId) {
       let agentId = _lastDispatchAgentId;
@@ -4609,11 +4759,11 @@ function populateStatusCard(data) {
 
     // Map agent colors
     const colorMap = {
-      0: 'var(--c-rose)',
+      0: 'var(--c-lovenotes)',
       1: 'var(--c-content)',
-      2: 'var(--c-cyan)',
+      2: 'var(--c-geoint)',
       3: 'var(--c-coder)',
-      4: 'var(--c-amber)',
+      4: 'var(--c-brandywine)',
       5: 'var(--c-designer)',
     };
 
@@ -4819,7 +4969,7 @@ async function dispatchToAgent(agentName, message) {
         <div class="dm-avatar">C</div>
         <div class="dm-body">
           <div class="dm-meta">
-            <span class="dm-from">the user</span>
+            <span class="dm-from">Christopher</span>
             <span class="dm-time">${timeStr}</span>
           </div>
           <div class="dm-text">${renderMarkdown(message)}</div>
@@ -4875,7 +5025,7 @@ async function dispatchToAgent(agentName, message) {
           <div class="dm-avatar">C</div>
           <div class="dm-body">
             <div class="dm-meta">
-              <span class="dm-from">the user</span>
+              <span class="dm-from">Christopher</span>
               <span class="dm-time">${timeStr}</span>
             </div>
             <div class="dm-text">${renderMarkdown(message)}</div>
@@ -6418,6 +6568,10 @@ let _chatSelectedAgentId = null;
 function switchView(view) {
   _currentView = view;
 
+  // Toggle body class for view-specific chrome (hides density/date in chat)
+  document.body.classList.toggle('view-chat', view === 'chat');
+  document.body.classList.toggle('view-timeline', view === 'timeline');
+
   // Hide all views
   document.getElementById('timelineWrap').style.display = 'none';
   document.getElementById('globalTerminal').style.display = 'none';
@@ -6519,6 +6673,10 @@ function selectChatAgent(agentId) {
   renderChatSidebar();
   loadChatThread(agentId);
   loadChatDetail();
+  // On mobile, auto-close the agents panel after selection
+  if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+    closeChatPanels();
+  }
 }
 
 async function loadChatThread(agentId) {
@@ -6549,7 +6707,7 @@ async function loadChatThread(agentId) {
       const avatarClass = isAssistant ? 'sutra' : 'human';
       const fromHtml = isAssistant
         ? agentChip(agent.name, agent.color || 'helper')
-        : '<span style="color:var(--text);">the user</span>';
+        : '<span style="color:var(--text);">Christopher</span>';
 
       html += `<div class="drawer-msg ${avatarClass}" style="margin-bottom:16px;">
         <div class="dm-avatar">${avatarLabel}</div>
@@ -6586,6 +6744,25 @@ async function loadChatThread(agentId) {
 
 // ── CHAT DETAIL PANEL (right sidebar) ──
 let _chatDetailTab = 'files';
+
+// Mobile panel toggles for chat view
+function toggleChatPanel(which) {
+  const sidebar = document.getElementById('chatSidebar');
+  const detail = document.getElementById('chatDetail');
+  const backdrop = document.getElementById('chatMobileBackdrop');
+  if (!sidebar || !detail || !backdrop) return;
+  const target = which === 'sidebar' ? sidebar : detail;
+  const other = which === 'sidebar' ? detail : sidebar;
+  const willOpen = !target.classList.contains('mobile-open');
+  other.classList.remove('mobile-open');
+  target.classList.toggle('mobile-open', willOpen);
+  backdrop.classList.toggle('show', willOpen);
+}
+function closeChatPanels() {
+  document.getElementById('chatSidebar')?.classList.remove('mobile-open');
+  document.getElementById('chatDetail')?.classList.remove('mobile-open');
+  document.getElementById('chatMobileBackdrop')?.classList.remove('show');
+}
 
 function switchChatDetail(tab) {
   _chatDetailTab = tab;
@@ -6877,18 +7054,19 @@ async function showResetModal(agentId) {
   html += `<div style="margin-bottom:16px;">
     <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Reset Mode</div>
     <label style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer;border-radius:6px;background:var(--bg-elev-2);margin-bottom:4px;">
-      <input type="radio" name="resetMode" value="spoof" checked style="accent-color:var(--sutra);">
+      <input type="radio" name="resetMode" value="spoof" checked onchange="updateResetModeUI()" style="accent-color:var(--sutra);">
       <div><span style="color:var(--text);font-size:12px;font-weight:500;">Compress history</span><br><span style="color:var(--text-faint);font-size:10px;">Spoof via Continuum — preserves conversation context</span></div>
     </label>
     <label style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer;border-radius:6px;">
-      <input type="radio" name="resetMode" value="fresh" style="accent-color:var(--sutra);">
+      <input type="radio" name="resetMode" value="fresh" onchange="updateResetModeUI()" style="accent-color:var(--sutra);">
       <div><span style="color:var(--text);font-size:12px;font-weight:500;">Fresh start</span><br><span style="color:var(--text-faint);font-size:10px;">Clean session — only injected docs, no history</span></div>
     </label>
   </div>`;
 
-  // Doc selection
+  // Doc selection — header reflects agent type
+  const typeLabel = ({sutra:'Sutra', project:'Project worker', utility:'Utility', worker:'Worker'})[_resetOptions.agent_type] || 'Worker';
   html += `<div style="margin-bottom:16px;">
-    <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Inject into next session</div>`;
+    <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Inject into next session <span style="color:var(--text-dim);text-transform:none;letter-spacing:0;">— ${typeLabel} defaults</span></div>`;
 
   let totalTokens = 0;
   (_resetOptions.available_docs || []).forEach(doc => {
@@ -6899,10 +7077,11 @@ async function showResetModal(agentId) {
       return age > 3 ? `<span style="color:#cc9e5c;font-size:9px;margin-left:4px;">${Math.floor(age)}d old</span>` : '';
     })() : '';
     const missing = !doc.exists ? '<span style="color:#d4908f;font-size:9px;margin-left:4px;">missing</span>' : '';
+    const synth = doc.synthetic ? '<span style="color:var(--sutra);font-size:9px;margin-left:4px;">live</span>' : '';
 
-    html += `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:4px;transition:background 0.1s;" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background=''">
+    html += `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:4px;transition:background 0.1s;" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background=''" title="${(doc.path || '').replace(/"/g,'&quot;')}">
       <input type="checkbox" ${checked} value="${doc.key}" class="reset-doc-check" onchange="updateResetTokens()" style="accent-color:var(--sutra);" ${!doc.exists ? 'disabled' : ''}>
-      <span style="flex:1;font-size:12px;color:${doc.exists ? 'var(--text)' : 'var(--text-faint)'};">${doc.name}${stale}${missing}</span>
+      <span style="flex:1;font-size:12px;color:${doc.exists ? 'var(--text)' : 'var(--text-faint)'};">${doc.name}${synth}${stale}${missing}</span>
       <span style="font-size:10px;color:var(--text-faint);font-family:'SF Mono',monospace;">${(doc.tokens/1000).toFixed(1)}k</span>
     </label>`;
   });
@@ -6910,8 +7089,8 @@ async function showResetModal(agentId) {
   html += `<div style="text-align:right;font-size:10px;color:var(--text-faint);margin-top:6px;" id="resetTokenTotal">~${(totalTokens/1000).toFixed(1)}k tokens</div>`;
   html += `</div>`;
 
-  // Steering prompt
-  html += `<div style="margin-bottom:16px;">
+  // Steering prompt (only meaningful for spoof)
+  html += `<div style="margin-bottom:16px;" id="resetSteeringWrap">
     <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Steering prompt (for spoof compression)</div>
     <textarea id="resetSteering" style="width:100%;height:60px;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:11px;color:var(--text);resize:vertical;font-family:inherit;box-sizing:border-box;" placeholder="Focus on dispatch patterns, drop hallucinated tool calls...">Preserve dispatch patterns and decisions. Drop hallucinated tool calls and narrated-but-not-executed actions.</textarea>
   </div>`;
@@ -6924,6 +7103,7 @@ async function showResetModal(agentId) {
 
   document.getElementById('resetBody').innerHTML = html;
   document.getElementById('resetModal').style.display = 'flex';
+  updateResetTokens(); // render % of model window using fresh totals
 }
 
 function hideResetModal() {
@@ -6940,7 +7120,19 @@ function updateResetTokens() {
     if (doc) total += doc.tokens;
   });
   const el = document.getElementById('resetTokenTotal');
-  if (el) el.textContent = `~${(total/1000).toFixed(1)}k tokens`;
+  if (!el) return;
+  const max = _resetOptions?.model_max_tokens || 0;
+  const pct = max ? (total / max * 100) : 0;
+  const warn = pct > 30 ? ' style="color:#cc9e5c;"' : '';
+  el.innerHTML = max
+    ? `~${(total/1000).toFixed(1)}k tokens <span${warn}>· ${pct.toFixed(1)}% of ${(max/1000).toFixed(0)}k window</span>`
+    : `~${(total/1000).toFixed(1)}k tokens`;
+}
+
+function updateResetModeUI() {
+  const mode = document.querySelector('input[name="resetMode"]:checked')?.value || 'spoof';
+  const wrap = document.getElementById('resetSteeringWrap');
+  if (wrap) wrap.style.display = mode === 'spoof' ? '' : 'none';
 }
 
 async function executeReset() {
@@ -7147,7 +7339,7 @@ async function refreshDebug() {
     // Session total — honest numbers, no fake cap
     let totalIn = 0, totalOut = 0, totalCost = 0;
     d.agents.forEach(a => { totalIn += a.input_tokens || 0; totalOut += a.output_tokens || 0; totalCost += a.cost_usd || 0; });
-    const agentColors = { Sutra:'#8b5cf6', CPA:'#d16b9e', ContentWriter:'#5a95d6', VirtualAdmin:'#d97e4e', Coder:'#5db3b3', Legal:'#b8864a', VirtualAdmin:'#d97e4e', VirtualAdmin:'#a78bfa' };
+    const agentColors = { Sutra:'#8b5cf6', LoveNotes:'#d16b9e', ContentWriter:'#5a95d6', GEOINT:'#d97e4e', Coder:'#5db3b3', Brandywine:'#b8864a', GeointTest:'#d97e4e', Mudra:'#a78bfa' };
 
     html += `<div style="background:#111116;border:1px solid #2a2a33;border-radius:6px;padding:8px 10px;margin-bottom:10px;">`;
     html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
@@ -7228,7 +7420,7 @@ async function refreshDebug() {
       const managedTag = s.managed
         ? '<span style="color:#4ade80;font-size:9px;margin-left:4px;">MANAGED</span>'
         : '<span style="color:#eab308;font-size:9px;margin-left:4px;">EXTERNAL</span>';
-      const cwdStr = s.cwd ? s.cwd.replace('$SUTRA_PROJECT_ROOT/', '~/') : 'unknown cwd';
+      const cwdStr = s.cwd ? s.cwd.replace('/Users/christopherk.marks/Downloads/personal-os-main/', '~/') : 'unknown cwd';
       html += `<div style="margin-bottom:4px;">`;
       html += `<span style="color:#e8e8ec;">pid:${s.pid}</span>${managedTag}`;
       html += `<div style="color:#4a4a54;margin-left:16px;font-size:10px;">${cwdStr}</div>`;

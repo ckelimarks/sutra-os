@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sutra Map</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #080b12;
+    --bg1:     #0d1018;
+    --line:    rgba(255,255,255,0.07);
+    --ink-0:   #f0f2f5;
+    --ink-1:   #a8b0c0;
+    --ink-2:   #5a6478;
+    --ink-3:   #363d4e;
+    --accent:  #4a8fff;
+    --busy:    #4fffb0;
+    --online:  #4a8fff;
+    --offline: #2e3547;
+    --warn:    #ffaa44;
+  }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink-0); font-family: 'SF Mono', 'JetBrains Mono', monospace; }
+
+  canvas { display: block; position: absolute; inset: 0; }
+
+  /* Header */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 40px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 16px;
+    background: rgba(8,11,18,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    z-index: 10;
+    font-size: 10px; letter-spacing: 0.08em;
+  }
+  #hud .logo { color: var(--accent); font-weight: 600; }
+  #hud .sep { color: var(--ink-3); }
+  #hud .stat { color: var(--ink-2); }
+  #hud .stat b { color: var(--ink-1); }
+  #hud .pulse {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--busy); margin-left: auto;
+    animation: blink 2s ease-in-out infinite;
+  }
+  #hud .pulse.err { background: var(--warn); animation: none; }
+  #hud .status-text { font-size: 9px; color: var(--ink-2); }
+
+  /* Tooltip */
+  #tip {
+    position: absolute;
+    background: rgba(13,16,24,0.95);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 13px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 20;
+    max-width: 260px;
+    backdrop-filter: blur(8px);
+  }
+  #tip .t-name { color: var(--ink-0); font-weight: 600; margin-bottom: 3px; }
+  #tip .t-role { color: var(--ink-3); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  #tip .t-row { display: flex; justify-content: space-between; gap: 16px; font-size: 10px; color: var(--ink-2); margin-bottom: 2px; }
+  #tip .t-row b { color: var(--ink-1); }
+  .t-busy  { color: var(--busy)  !important; }
+  .t-online { color: var(--online) !important; }
+  .t-offline { color: var(--offline) !important; }
+
+  @keyframes blink { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+
+  /* Cluster sidebar (left) */
+  #sidebar {
+    position: absolute; top: 40px; left: 0; bottom: 0; width: 268px;
+    background: rgba(8,11,18,0.97);
+    border-right: 1px solid rgba(255,255,255,0.07);
+    z-index: 25; backdrop-filter: blur(20px);
+    transform: translateX(-100%);
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
+    display: flex; flex-direction: column;
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar-header {
+    padding: 16px 16px 0; flex-shrink: 0;
+  }
+  #sidebar-close {
+    position: absolute; top: 14px; right: 12px;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--ink-2); font-size: 16px; border-radius: 4px;
+    transition: color 0.12s, background 0.12s;
+  }
+  #sidebar-close:hover { color: var(--ink-0); background: rgba(255,255,255,0.06); }
+  #sb-cluster-name {
+    font-size: 13px; font-weight: 600; color: var(--ink-0); margin-bottom: 12px; padding-right: 28px;
+  }
+  .sb-tabs {
+    display: flex; gap: 2px; margin-bottom: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .sb-tab {
+    padding: 6px 12px; font-size: 9px; letter-spacing: 0.1em;
+    color: var(--ink-3); cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: color 0.12s, border-color 0.12s;
+    white-space: nowrap;
+  }
+  .sb-tab:hover { color: var(--ink-1); }
+  .sb-tab.active { color: var(--ink-0); border-bottom-color: var(--accent); }
+  #sidebar-body { flex: 1; overflow-y: auto; padding: 8px 0; scrollbar-width: none; }
+  #sidebar-body::-webkit-scrollbar { display: none; }
+  .sb-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 16px; cursor: pointer;
+    transition: background 0.1s;
+    border-left: 2px solid transparent;
+  }
+  .sb-item:hover { background: rgba(255,255,255,0.03); }
+  .sb-item.selected {
+    background: rgba(255,255,255,0.05);
+    border-left-color: var(--accent);
+  }
+  .sb-item-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .sb-item-body { flex: 1; min-width: 0; }
+  .sb-item-name { font-size: 11px; color: var(--ink-0); font-weight: 500; margin-bottom: 2px; }
+  .sb-item-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-item-kind { font-size: 8px; letter-spacing: 0.08em; color: var(--ink-3); flex-shrink: 0; margin-top: 3px; text-transform: uppercase; }
+  .sb-hint { font-size: 9px; color: var(--ink-3); padding: 8px 16px; letter-spacing: 0.06em; }
+
+  /* Detail panel */
+  #detail {
+    position: absolute; top: 40px; right: 0; bottom: 0; width: 288px;
+    background: rgba(8,11,18,0.97);
+    border-left: 1px solid rgba(255,255,255,0.07);
+    padding: 20px 18px 28px;
+    z-index: 25;
+    backdrop-filter: blur(20px);
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
+    display: flex; flex-direction: column; gap: 0;
+  }
+  #detail.open { transform: translateX(0); }
+  #detail-close {
+    position: absolute; top: 14px; right: 14px;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--ink-2); font-size: 16px; line-height: 1;
+    border-radius: 4px;
+    transition: color 0.12s, background 0.12s;
+  }
+  #detail-close:hover { color: var(--ink-0); background: rgba(255,255,255,0.06); }
+  .d-name { font-size: 15px; font-weight: 600; color: var(--ink-0); margin-bottom: 3px; padding-right: 28px; }
+  .d-role { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 14px; }
+  .d-section { font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin: 14px 0 6px; }
+  .d-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 10px; color: var(--ink-2); margin-bottom: 5px; line-height: 1.4; }
+  .d-row b { color: var(--ink-1); text-align: right; max-width: 160px; word-break: break-all; }
+  .d-task {
+    font-size: 11px; color: var(--ink-1); line-height: 1.5;
+    background: rgba(255,255,255,0.03); border-radius: 6px;
+    padding: 10px 11px; margin: 0;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .d-sep { height: 1px; background: rgba(255,255,255,0.05); margin: 14px 0 0; }
+  .d-ctx-bar {
+    height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    margin-top: 6px; overflow: hidden;
+  }
+  .d-ctx-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .d-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+  /* Base nav (project tabs) */
+  .base-nav {
+    display: flex; align-items: center; gap: 5px;
+    margin: 0 auto;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .base-nav::-webkit-scrollbar { display: none; }
+  .base-pip {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+    color: rgba(255,255,255,0.28);
+    font-size: 10px; letter-spacing: 0.04em;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .base-pip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    flex-shrink: 0; opacity: 0.4;
+    transition: opacity 0.18s, box-shadow 0.18s;
+  }
+  .base-pip:hover { color: rgba(255,255,255,0.6); }
+  .base-pip.active {
+    color: rgba(255,255,255,0.9);
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+  }
+  .base-pip.active .dot { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <span class="logo">SUTRA</span>
+  <div class="base-nav" id="baseNav"></div>
+  <span class="stat" id="hudBusy">—</span>
+  <span class="pulse" id="hudPulse"></span>
+  <span class="status-text" id="hudStatus">connecting…</span>
+</div>
+
+<div id="tip">
+  <div class="t-name" id="tipName">—</div>
+  <div class="t-role" id="tipRole">—</div>
+  <div class="t-row"><span>status</span><b id="tipStatus">—</b></div>
+  <div class="t-row"><span>context</span><b id="tipCtx">—</b></div>
+  <div class="t-row"><span>unread</span><b id="tipUnread">—</b></div>
+  <div class="t-row"><span>last active</span><b id="tipLast">—</b></div>
+  <div class="t-row"><span>project</span><b id="tipProject">—</b></div>
+</div>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div id="sb-cluster-name">—</div>
+    <div class="sb-tabs" id="sbTabs"></div>
+  </div>
+  <div id="sidebar-close">×</div>
+  <div id="sidebar-body"></div>
+</div>
+
+<div id="detail">
+  <div id="detail-close">×</div>
+  <div class="d-name" id="detailName">—</div>
+  <div class="d-role" id="detailRole">—</div>
+  <div class="d-task" id="detailTask">—</div>
+  <div class="d-sep"></div>
+  <div class="d-section">session</div>
+  <div class="d-row"><span>session</span><b id="detailSessionId" style="font-family:monospace;font-size:8px">—</b></div>
+  <div class="d-row"><span>last active</span><b id="detailLast">—</b></div>
+  <div class="d-sep"></div>
+  <div class="d-section">status</div>
+  <div class="d-row"><span>state</span><b id="detailStatus">—</b></div>
+  <div class="d-row"><span>project</span><b id="detailProject">—</b></div>
+  <div class="d-row"><span>unread</span><b id="detailUnread">—</b></div>
+  <div class="d-sep"></div>
+  <div class="d-section">location</div>
+  <div class="d-row"><span>at</span><b id="detailAt">—</b></div>
+  <div class="d-row"><span>going to</span><b id="detailGoingTo">—</b></div>
+  <div class="d-sep"></div>
+  <div class="d-section">context</div>
+  <div class="d-row"><span>usage</span><b id="detailCtxPct">—</b></div>
+  <div class="d-ctx-bar"><div class="d-ctx-fill" id="detailCtxBar" style="width:0%"></div></div>
+  <div class="d-sep"></div>
+  <div class="d-section">session window</div>
+  <div id="detailMessages" style="font-size:9px;max-height:140px;overflow-y:auto;color:var(--ink-2)"></div>
+</div>
+
+<script src="tree.js"></script>
+<script type="module">
+/* ---------------------------------------------------------------
+   21-sutra-map — read-only live view of Sutra agents at :8900
+   No fake data. No writes. Just listening.
+   Project clusters take constellation forms based on their file structure.
+--------------------------------------------------------------- */
+
+import {
+  hashStr, pickForm,
+  buildHub, buildBranching, buildPair, buildSeal, buildStream, buildNexus, BUILDERS,
+  KIND_COLOR, kindColor,
+  TOOL_PATTERNS, parseToolFromAction,
+  relTime, deriveTask, statusColor, spaced, seededRandom,
+  toScreen as _toScreen, fromScreen as _fromScreen,
+} from '../../lib/constellation.js';
+
+const SUTRA = 'http://localhost:8900';
+const POLL_MS = 5000;
+
+// ---- Canvas setup ----
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width  = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', () => { resize(); });
+resize();
+
+// ---- Camera (lerp-eased, like 20-tree) ----
+const cam = { x: 0, y: 0, scale: 1, tx: 0, ty: 0, ts: 1 };
+const CAM_K = 0.12; // easing constant
+function lerpCam() {
+  cam.x += (cam.tx - cam.x) * CAM_K;
+  cam.y += (cam.ty - cam.y) * CAM_K;
+  cam.scale += (cam.ts - cam.scale) * CAM_K;
+}
+const toScreen = (wx, wy) => _toScreen(wx, wy, cam, W, H);
+const fromScreen = (sx, sy) => _fromScreen(sx, sy, cam, W, H);
+
+// ---- State ----
+let projects = {};   // projectKey → { name, wx, wy, hue, agents:[] }
+let agentList = [];
+let tick = 0;
+let hoverAgent = null;
+let contextCache = {}; // agentId → { percent, fetched }
+let toolCache = {};   // agentId → 'READ' | 'WRITE' | 'BASH' | 'GREP' | ...
+
+// ---- Derive project from cwd ----
+function projectKey(cwd, role) {
+  // Sutra orchestrator at the OS root → its own special "sutra" cluster
+  if (role === 'orchestrator') return 'sutra';
+  if (!cwd) return 'sutra';
+  const baseRe = /^\/Users\/christopherk\.marks\/Downloads\/personal-os-main\/?/;
+  const rel = cwd.replace(baseRe, '');
+  if (!rel) return 'sutra'; // root directory = sutra workspace
+  const parts = rel.split('/').filter(Boolean);
+  if (parts[0] === 'Projects') {
+    // Go deeper: prefer parts[2] for nested projects (e.g., prototypes/scratch → scratch)
+    // Falls back to parts[1] for top-level projects (e.g., lovenotes → lovenotes)
+    if (parts[2]) return parts[2];
+    if (parts[1]) return parts[1];
+  }
+  return parts[0] || 'sutra';
+}
+
+function projectLabel(key) {
+  return key.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+
+// Get seeds (file-name pairs) for a project
+function seedsFor(key) {
+  // Special: "sutra" cluster is the OS root — show its top-level identity files
+  if (key === 'sutra') {
+    return [
+      ['SUTRA-IDENTITY.md', 'doc'],
+      ['CLAUDE.md', 'doc'],
+      ['TELOS.md', 'doc'],
+      ['CONTEXT.md', 'doc'],
+      ['TASKS.md', 'note'],
+      ['GOALS.md', 'note'],
+      ['AGENTS.md', 'doc'],
+      ['Projects', 'folder'],
+      ['Knowledge', 'folder'],
+      ['Network', 'folder'],
+      ['Me', 'folder'],
+    ];
+  }
+  // REAL_TREE keys are mixed case ("AI Research", "lovenotes", etc.)
+  let treeKey = key;
+  let tree = REAL_TREE[key];
+  if (!tree) {
+    treeKey = Object.keys(REAL_TREE).find(t => t.toLowerCase() === key.toLowerCase()) || key;
+    tree = REAL_TREE[treeKey];
+  }
+  if (!tree || !tree.children) return [[key, 'folder']];
+  // Store resolved path on the cache so layoutProjects can use it
+  if (!seedsFor._pathCache) seedsFor._pathCache = {};
+  seedsFor._pathCache[key] = tree.path || null;
+  const entries = Object.entries(tree.children).slice(0, 14);
+  if (!entries.length) return [[key, 'folder']];
+  return entries.map(([name, n]) => [name, n.kind || 'note']);
+}
+
+// ---- Assign world positions to projects ----
+function layoutProjects(keys) {
+  const newProjects = {};
+  // Sort: orchestrator (sutra) first → goes to center; then by name for stable layout
+  keys.sort((a, b) => {
+    if (a === 'sutra') return -1;
+    if (b === 'sutra') return 1;
+    return a.localeCompare(b);
+  });
+  const outerKeys = keys.filter(k => k !== 'sutra');
+  keys.forEach((key, i) => {
+    if (projects[key]) {
+      newProjects[key] = projects[key];
+    } else {
+      // Sutra at center; others equally spaced on a circle
+      let wx = 0, wy = 0;
+      if (key !== 'sutra') {
+        const idx = outerKeys.indexOf(key);
+        const r = 800;
+        const angle = (idx / outerKeys.length) * Math.PI * 2 - Math.PI / 2;
+        wx = Math.cos(angle) * r;
+        wy = Math.sin(angle) * r;
+      }
+      newProjects[key] = {
+        name: projectLabel(key),
+        wx, wy,
+        hue: key === 'sutra' ? 280 : (i * 53) % 360,
+        agents: [],
+        radius: 0,
+        cwdBase: null,
+      };
+    }
+    newProjects[key].agents = [];
+  });
+  return newProjects;
+}
+
+// ---- Fetch ----
+async function fetchAgents() {
+  try {
+    const res = await fetch(SUTRA + '/api/agents');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const agents = data.agents || [];
+
+    // Sort agents: busy first, then online, then offline
+    agents.sort((a, b) => {
+      const rank = { busy: 0, online: 1, offline: 2 };
+      return (rank[a.status] ?? 3) - (rank[b.status] ?? 3);
+    });
+
+    // Group by project
+    const keys = [...new Set(agents.map(a => projectKey(a.cwd)))].sort();
+    const oldProjects = projects;
+    projects = layoutProjects(keys);
+
+    // Assign agents → projects, set node positions around cluster center
+    agents.forEach(agent => {
+      const key = projectKey(agent.cwd, agent.role);
+      if (!projects[key]) return;
+      projects[key].agents.push(agent);
+      // Store real disk path from any agent (first wins) — handles nested projects too
+      if (!projects[key].cwdBase) {
+        projects[key].cwdBase = agent.cwd;
+      }
+    });
+
+    // Build constellation form per cluster + assign agents to file nodes
+    Object.entries(projects).forEach(([key, proj]) => {
+      const seeds = seedsFor(key);
+      // Sutra (orchestrator) uses OS root; others already have cwdBase from agents
+      if (!proj.cwdBase && key === 'sutra') {
+        proj.cwdBase = '/Users/christopherk.marks/Downloads/personal-os-main';
+      }
+      const isOrch = proj.agents.some(a => a.role === 'orchestrator');
+      proj.form = pickForm(key, seeds.length - 1, isOrch);
+      // Radius scales with file count + agent count
+      proj.radius = Math.max(120, Math.min(260, 100 + seeds.length * 12 + proj.agents.length * 20));
+      proj.id = key;
+      proj.cx = proj.wx;
+      proj.cy = proj.wy;
+      const built = BUILDERS[proj.form](proj, seeds);
+      proj.fileNodes = built.nodes;
+      proj.fileEdges = built.edges;
+    });
+
+
+    // Assign each agent to a file node within its cluster (preferring matching kind)
+    Object.values(projects).forEach(proj => {
+      const fileNodes = proj.fileNodes || [];
+      proj.agents.forEach((agent, i) => {
+        // Pick a file node — orchestrator on core, others spread out, prefer kind match
+        let target;
+        if (agent.role === 'orchestrator') {
+          target = fileNodes.find(n => n.isCore) || fileNodes[0];
+        } else {
+          // Distribute non-orchestrator agents across non-core nodes
+          const candidates = fileNodes.filter(n => !n.isCore);
+          target = candidates[i % Math.max(candidates.length, 1)] || fileNodes[0];
+        }
+        agent._nx = target ? target.x : proj.wx;
+        agent._ny = target ? target.y : proj.wy;
+        // Carry over ALL animation state from previous poll — prevents snap on refresh
+        const prev = agentList.find(a => a.id === agent.id);
+        if (prev && prev._x !== undefined) {
+          agent._x          = prev._x;
+          agent._y          = prev._y;
+          agent._targetFile = prev._targetFile ?? (target ? target.id : null);
+          agent._driftT     = prev._driftT;
+          agent._driftSpeed = prev._driftSpeed;
+          agent._driftPrev  = prev._driftPrev;
+          agent._driftPrevY = prev._driftPrevY;
+          agent._driftTarget  = prev._driftTarget;
+          agent._driftTargetY = prev._driftTargetY;
+          agent._dwellT     = prev._dwellT;
+        } else {
+          const initAng = Math.random() * Math.PI * 2;
+          const initR = 28 + Math.random() * 12;
+          agent._x = agent._nx + Math.cos(initAng) * initR;
+          agent._y = agent._ny + Math.sin(initAng) * initR;
+          agent._targetFile = target ? target.id : null;
+          agent._driftPrev = agent._x;
+          agent._driftPrevY = agent._y;
+          agent._driftTarget = agent._x;
+          agent._driftTargetY = agent._y;
+        }
+      });
+    });
+
+    agentList = agents;
+    buildBaseNav();
+    if (!activeProjectKey && Object.keys(projects).length) {
+      activeProjectKey = 'sutra';
+      updateBaseNav('sutra');
+    }
+    updateHUD(agents);
+    setStatus('live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), false);
+    refreshDetailIfOpen();
+    if (sidebarProjectKey) renderSidebarBody();
+
+    // Fetch context + tool status per agent
+    agents.forEach(agent => {
+      if (!contextCache[agent.id]) fetchContext(agent.id);
+      if (agent.status === 'busy') fetchTool(agent.id);
+    });
+
+  } catch (e) {
+    setStatus('offline — ' + e.message, true);
+  }
+}
+
+async function fetchContext(agentId) {
+  try {
+    const res = await fetch(SUTRA + '/api/agents/' + agentId + '/context');
+    if (!res.ok) return;
+    const d = await res.json();
+    contextCache[agentId] = d;
+  } catch (_) {}
+}
+
+async function fetchTool(agentId) {
+  try {
+    const res = await fetch(SUTRA + '/api/agents/' + agentId + '/recent?n=1');
+    if (!res.ok) return;
+    const d = await res.json();
+    const tool = parseToolFromAction(d.last_action);
+    if (tool) toolCache[agentId] = tool;
+  } catch (_) {}
+}
+
+function updateHUD(agents) {
+  const busy = agents.filter(a => a.status === 'busy').length;
+  const online = agents.filter(a => a.status === 'online').length;
+  document.getElementById('hudBusy').innerHTML = `<b>${busy}</b> busy · <b>${online}</b> online`;
+}
+
+// ---- Base nav ----
+let activeProjectKey = null;
+let focusedProjectKey = null;
+let gpProjIdx = 0;
+let gpPrevBtns = {};
+
+function focusProject(key) {
+  const proj = projects[key];
+  if (!proj) return;
+  cam.tx = -proj.wx;
+  cam.ty = -proj.wy;
+  cam.ts = Math.max(cam.ts, 0.9);
+  activeProjectKey = key;
+  updateBaseNav(key);
+}
+
+function setFocusProject(key) {
+  focusedProjectKey = key;
+  focusProject(key);
+}
+
+function clearFocus() {
+  focusedProjectKey = null;
+}
+
+function buildBaseNav() {
+  const nav = document.getElementById('baseNav');
+  nav.innerHTML = '';
+  const keys = Object.keys(projects).sort((a, b) => {
+    if (a === 'sutra') return -1;
+    if (b === 'sutra') return 1;
+    return a.localeCompare(b);
+  });
+  keys.forEach(key => {
+    const proj = projects[key];
+    const pip = document.createElement('div');
+    pip.className = 'base-pip';
+    pip.dataset.key = key;
+    const col = `hsl(${proj.hue},70%,60%)`;
+    const shadow = `0 0 6px hsl(${proj.hue},70%,50%)`;
+    pip.innerHTML = `<span class="dot" style="background:${col};box-shadow:${shadow}"></span>${proj.name}`;
+    pip.addEventListener('click', () => focusProject(key));
+    nav.appendChild(pip);
+  });
+  if (activeProjectKey) updateBaseNav(activeProjectKey);
+}
+
+function updateBaseNav(key) {
+  document.querySelectorAll('.base-pip').forEach(p => {
+    const isActive = p.dataset.key === key;
+    p.classList.toggle('active', isActive);
+    const dot = p.querySelector('.dot');
+    const proj = projects[p.dataset.key];
+    if (proj) dot.style.boxShadow = isActive
+      ? `0 0 10px hsl(${proj.hue},80%,55%), 0 0 20px hsl(${proj.hue},80%,40%)`
+      : `0 0 6px hsl(${proj.hue},70%,50%)`;
+  });
+}
+
+function gpCycleProject(dir) {
+  const keys = Object.keys(projects).sort((a, b) => {
+    if (a === 'sutra') return -1;
+    if (b === 'sutra') return 1;
+    return a.localeCompare(b);
+  });
+  if (!keys.length) return;
+  const cur = activeProjectKey ? keys.indexOf(activeProjectKey) : 0;
+  gpProjIdx = (cur + dir + keys.length) % keys.length;
+  focusedProjectKey = keys[gpProjIdx];
+  focusProject(keys[gpProjIdx]);
+}
+
+function setStatus(msg, err) {
+  const el = document.getElementById('hudStatus');
+  const dot = document.getElementById('hudPulse');
+  el.textContent = msg;
+  dot.className = 'pulse' + (err ? ' err' : '');
+}
+
+// ---- Get target file name for an agent ----
+function targetFileName(agent) {
+  if (!agent._targetFile) return null;
+  for (const proj of Object.values(projects)) {
+    if (!proj.agents.includes(agent)) continue;
+    const node = (proj.fileNodes || []).find(n => n.id === agent._targetFile);
+    return node ? node.label : null;
+  }
+  return null;
+}
+
+// ---- PRNG (stable star field) ----
+const prng = seededRandom;
+
+// ---- Star field (drawn once into offscreen canvas) ----
+let starCanvas = null;
+function buildStars() {
+  starCanvas = document.createElement('canvas');
+  starCanvas.width = W; starCanvas.height = H;
+  const sc = starCanvas.getContext('2d');
+  const rand = prng(42);
+  for (let i = 0; i < 280; i++) {
+    const x = rand() * W, y = rand() * H;
+    const r = rand() * 0.9 + 0.15;
+    const a = rand() * 0.28 + 0.05;
+    sc.fillStyle = `rgba(200,210,240,${a})`;
+    sc.beginPath(); sc.arc(x, y, r, 0, Math.PI * 2); sc.fill();
+  }
+}
+
+// ---- Draw ----
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Stars
+  if (starCanvas) ctx.drawImage(starCanvas, 0, 0);
+
+  // Dot-grid in world space (matches 20-tree)
+  const spacing = 60;
+  const s = cam.scale;
+  const effSpacing = spacing * s;
+  if (effSpacing >= 12) {
+    const offsetX = (-cam.x * s) % effSpacing;
+    const offsetY = (-cam.y * s) % effSpacing;
+    const baseX = W / 2 + offsetX;
+    const baseY = H / 2 + offsetY;
+    ctx.fillStyle = 'rgba(120,130,170,0.06)';
+    for (let x = baseX - Math.ceil(W / effSpacing + 2) * effSpacing; x < W + effSpacing; x += effSpacing)
+      for (let y = baseY - Math.ceil(H / effSpacing + 2) * effSpacing; y < H + effSpacing; y += effSpacing) {
+        ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+      }
+  }
+
+  tick++;
+
+  // Draw halos first (back to front)
+  Object.values(projects).forEach(proj => drawProjectHalo(proj));
+  // Then edges + nodes + agents
+  Object.values(projects).forEach(proj => drawProject(proj));
+}
+
+// Kind visual tables (matching 20-tree)
+const KIND_HUE = { code: 195, doc: 42, note: 260, folder: 160 };
+const KIND_SAT = { code: 80, doc: 55, note: 38, folder: 45 };
+const KIND_LIT = { code: 72, doc: 68, note: 60, folder: 62 };
+const KIND_ALP = { code: 1.0, doc: 0.82, note: 0.58, folder: 0.72 };
+
+function drawProjectHalo(proj) {
+  const sc = toScreen(proj.wx, proj.wy);
+  const r = proj.radius * cam.scale;
+  const hasBusy = proj.agents.some(a => a.status === 'busy');
+  const bright = hasBusy ? 1.0 : proj.agents.some(a => a.status === 'online') ? 0.65 : 0.3;
+  const grd = ctx.createRadialGradient(sc.x, sc.y, r * 0.2, sc.x, sc.y, r * 1.35);
+  grd.addColorStop(0, `hsla(${proj.hue},60%,60%,${0.055 * bright})`);
+  grd.addColorStop(1, 'hsla(0,0%,0%,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(sc.x, sc.y, r * 1.35, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawProject(proj) {
+  const sc = toScreen(proj.wx, proj.wy);
+  const r = proj.radius * cam.scale;
+  if (sc.x + r * 1.5 < 0 || sc.x - r * 1.5 > W || sc.y + r * 1.5 < 0 || sc.y - r * 1.5 > H) return;
+
+  const hasBusy = proj.agents.some(a => a.status === 'busy');
+  const bright = hasBusy ? 1.0 : proj.agents.some(a => a.status === 'online') ? 0.68 : 0.35;
+  const hue = proj.hue;
+
+  // Focus ring
+  if (proj.id === focusedProjectKey) {
+    const ringR = (proj.radius + 22) * cam.scale;
+    const pulse = 0.5 + 0.18 * Math.sin(tick * 0.045);
+    ctx.beginPath();
+    ctx.arc(sc.x, sc.y, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${hue}, 70%, 72%, ${pulse})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // Outer dim ring
+    ctx.beginPath();
+    ctx.arc(sc.x, sc.y, ringR + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${hue}, 60%, 60%, ${pulse * 0.3})`;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+  }
+
+  // File edges (constellation skeleton — very dim)
+  if (proj.fileEdges && proj.fileNodes) {
+    const nm = {};
+    proj.fileNodes.forEach(n => nm[n.id] = n);
+    proj.fileEdges.forEach(e => {
+      const a = nm[e.a], b = nm[e.b];
+      if (!a || !b) return;
+      const sa = toScreen(a.x, a.y), sb = toScreen(b.x, b.y);
+      ctx.beginPath();
+      ctx.moveTo(sa.x, sa.y);
+      ctx.lineTo(sb.x, sb.y);
+      ctx.strokeStyle = e.isBridge
+        ? `hsla(${hue},45%,70%,${0.28 * bright})`
+        : `hsla(${hue},28%,60%,${0.18 * bright})`;
+      ctx.lineWidth = e.isBridge ? 1.0 : 0.7;
+      ctx.stroke();
+    });
+  }
+
+  // File nodes (stars in the constellation)
+  if (proj.fileNodes) {
+    proj.fileNodes.forEach(fn => {
+      const agentOn = proj.agents.some(a => a._targetFile === fn.id);
+      const fs = toScreen(fn.x, fn.y);
+      const kh = KIND_HUE[fn.kind] || 260;
+      const ks = KIND_SAT[fn.kind] || 50;
+      const kl = KIND_LIT[fn.kind] || 65;
+      const ka = KIND_ALP[fn.kind] || 0.7;
+      const rPx = fn.isCore ? 4.5 : 2.8;
+      const glowR = fn.isCore ? (agentOn ? 18 : 14) : (agentOn ? 12 : 6);
+
+      // Agent-occupied glow
+      if (agentOn) {
+        const ag = ctx.createRadialGradient(fs.x, fs.y, 0, fs.x, fs.y, glowR + 10);
+        ag.addColorStop(0, `hsla(${kh},${ks}%,${kl}%,${0.45 * bright})`);
+        ag.addColorStop(1, 'hsla(0,0%,0%,0)');
+        ctx.fillStyle = ag;
+        ctx.beginPath(); ctx.arc(fs.x, fs.y, glowR + 10, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // Base glow halo
+      const g = ctx.createRadialGradient(fs.x, fs.y, 0, fs.x, fs.y, glowR);
+      g.addColorStop(0, `hsla(${kh},${ks}%,${kl}%,${0.55 * bright * (agentOn ? 1.4 : 1)})`);
+      g.addColorStop(1, 'hsla(0,0%,0%,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(fs.x, fs.y, glowR, 0, Math.PI * 2); ctx.fill();
+
+      // Core dot
+      ctx.fillStyle = `hsla(${kh},${ks}%,${kl}%,${ka * bright * (agentOn ? 1.0 : 0.85)})`;
+      ctx.beginPath(); ctx.arc(fs.x, fs.y, rPx * (agentOn ? 1.2 : 1), 0, Math.PI * 2); ctx.fill();
+
+      // Node labels — fade in as you zoom
+      if (cam.scale > 0.7 && fn.label) {
+        const zoomAlpha = Math.min(1, (cam.scale - 0.7) / 0.6);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = `${agentOn ? '500' : '400'} 9px "JetBrains Mono", "SF Mono", monospace`;
+        ctx.fillStyle = agentOn
+          ? `rgba(231,233,242,${zoomAlpha * bright})`
+          : `hsla(${kh},${ks}%,${kl}%,${zoomAlpha * bright * 0.6})`;
+        const lbl = fn.label.length > 20 ? fn.label.slice(0, 18) + '…' : fn.label;
+        ctx.fillText(lbl, fs.x, fs.y + rPx + 4);
+        ctx.restore();
+      }
+    });
+  }
+
+  // Cluster label (spaced, like 20-tree)
+  const below = sc.y + r + 14;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `600 11px "JetBrains Mono", "SF Mono", monospace`;
+  ctx.fillStyle = hasBusy ? '#e7e9f2' : (bright < 0.45 ? '#4a4e63' : '#b8bccf');
+  ctx.fillText(spaced(proj.name.toUpperCase()), sc.x, below);
+  ctx.font = `400 9px "JetBrains Mono", "SF Mono", monospace`;
+  ctx.fillStyle = hasBusy ? '#6b6f88' : '#383c52';
+  ctx.fillText(proj.form + '  ·  ' + proj.agents.length + ' agent' + (proj.agents.length !== 1 ? 's' : ''), sc.x, below + 14);
+  ctx.restore();
+
+  // Agents
+  proj.agents.forEach(agent => drawAgent(agent));
+}
+
+function drawAgent(agent) {
+  if (agent._x === undefined) return;
+  const pos = toScreen(agent._x, agent._y);
+  const isBusy = agent.status === 'busy';
+  const isOffline = agent.status === 'offline';
+  const isOrch = agent.role === 'orchestrator';
+  const hasUnread = agent.unread_count > 0;
+
+  // Color: orchestrator = amber, busy worker = green, online = dim green, offline = grey
+  const color = isOrch
+    ? [245, 183, 61]
+    : isBusy   ? [111, 225, 177]
+    : isOffline ? [48, 56, 80]
+    : [111, 225, 177];
+
+  const baseR = isOrch ? 4.5 : (isBusy ? 3.8 : 2.8);
+  const glowR = isOrch ? 18 : (isBusy ? 14 : (isOffline ? 4 : 9));
+  const pulse = isBusy ? (0.6 + 0.4 * Math.sin(tick * 0.06))
+              : isOrch  ? (0.75 + 0.25 * Math.sin(tick * 0.035))
+              : 0.85;
+
+  // Unread warm ring
+  if (hasUnread && !isOffline) {
+    const ug = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR + 8);
+    ug.addColorStop(0, `rgba(245,183,61,${0.22 * pulse})`);
+    ug.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ug;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, glowR + 8, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Outer glow
+  const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
+  g.addColorStop(0, `rgba(${color.join(',')},${0.6 * pulse})`);
+  g.addColorStop(1, `rgba(${color.join(',')},0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2); ctx.fill();
+
+  // Solid dot
+  ctx.fillStyle = `rgba(${color.join(',')},${isOffline ? 0.35 : 0.95})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, baseR, 0, Math.PI * 2); ctx.fill();
+
+  // Inner bright white core
+  if (!isOffline) {
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, baseR * 0.38, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Context arc
+  const ctxd = contextCache[agent.id];
+  if (ctxd && cam.scale > 0.5) {
+    const pct = ctxd.percent / 100;
+    const arcCol = pct > 0.8 ? 'rgba(255,68,68,0.8)' : pct > 0.6 ? 'rgba(255,170,68,0.7)' : 'rgba(100,180,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, baseR + 3, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+    ctx.strokeStyle = arcCol;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Name + AGENT label + task
+  if (cam.scale > 0.5) {
+    const za = Math.min(1, (cam.scale - 0.5) / 0.4);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = `600 9px "JetBrains Mono", "SF Mono", monospace`;
+    ctx.fillStyle = isOffline ? `rgba(100,110,140,${za})` : `rgba(220,225,240,${za})`;
+    const labelTop = pos.y + baseR + 6;
+    ctx.fillText(agent.display_name || agent.name, pos.x, labelTop);
+    ctx.font = `400 8px "JetBrains Mono", "SF Mono", monospace`;
+    ctx.fillStyle = isOffline ? `rgba(100,110,140,${za * 0.7})` : `rgba(${color.join(',')},${za * 0.8})`;
+    const statusToken = isOffline ? 'OFFLINE' : isBusy ? 'BUSY' : 'IDLE';
+    const typeLabel = isOrch ? 'SUTRA' : 'AGENT';
+    ctx.fillText(typeLabel + ' · ' + statusToken, pos.x, labelTop + 11);
+    const yOff = labelTop + 23;
+    if (cam.scale > 0.85 && !isOffline) {
+      const tool = toolCache[agent.id];
+      if (tool) {
+        ctx.font = `600 8px "JetBrains Mono", "SF Mono", monospace`;
+        ctx.fillStyle = `rgba(${color.join(',')},${za * 0.7})`;
+        ctx.fillText(tool, pos.x, yOff);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+// ---- Interaction ----
+let drag = { active: false, last: null };
+let pinch = null;
+
+let dragDist = 0;
+let lastClickTime = 0;
+let lastClickPos = null;
+canvas.addEventListener('mousedown', e => {
+  drag.active = true;
+  drag.last = { x: e.clientX, y: e.clientY };
+  dragDist = 0;
+});
+canvas.addEventListener('mousemove', e => {
+  if (drag.active) {
+    const dx = e.clientX - drag.last.x;
+    const dy = e.clientY - drag.last.y;
+    cam.tx += dx / cam.scale;
+    cam.ty += dy / cam.scale;
+    dragDist += Math.hypot(dx, dy);
+    drag.last = { x: e.clientX, y: e.clientY };
+  }
+  // Hover
+  const w = fromScreen(e.clientX, e.clientY);
+  let found = null;
+  agentList.forEach(a => {
+    const dx = a._x - w.x, dy = a._y - w.y;
+    if (Math.hypot(dx, dy) < 16 / cam.scale) found = a;
+  });
+  hoverAgent = found;
+  if (found) showTip(found, e.clientX, e.clientY);
+  else hideTip();
+});
+canvas.addEventListener('mouseup', e => {
+  if (dragDist < 5) {
+    const now = Date.now();
+    const w = fromScreen(e.clientX, e.clientY);
+    const isDouble = now - lastClickTime < 320 &&
+      lastClickPos && Math.hypot(e.clientX - lastClickPos.x, e.clientY - lastClickPos.y) < 24;
+
+    if (isDouble) {
+      // Double-click: open sidebar for nearest project
+      let nearest = null, nearestD = Infinity;
+      Object.entries(projects).forEach(([key, proj]) => {
+        const d = Math.hypot(proj.wx - w.x, proj.wy - w.y);
+        if (d < nearestD) { nearestD = d; nearest = key; }
+      });
+      if (nearest && nearestD < 600 / cam.scale) openSidebar(nearest);
+      lastClickTime = 0;
+    } else {
+      // Single click: agent → detail, cluster → sidebar, empty → close
+      let clickedAgent = null;
+      agentList.forEach(a => {
+        if (a._x === undefined) return;
+        if (Math.hypot(a._x - w.x, a._y - w.y) < 18 / cam.scale) clickedAgent = a;
+      });
+      if (clickedAgent) {
+        openDetail(clickedAgent);
+      } else {
+        // Check if near a project center
+        let nearProj = null, nearD = Infinity;
+        Object.entries(projects).forEach(([key, proj]) => {
+          const d = Math.hypot(proj.wx - w.x, proj.wy - w.y);
+          if (d < nearD && d < proj.radius * 1.1) { nearD = d; nearProj = key; }
+        });
+        if (nearProj) {
+          openSidebar(nearProj);
+        } else {
+          closeSidebar(); closeDetail(); clearFocus();
+        }
+      }
+      lastClickTime = now;
+      lastClickPos = { x: e.clientX, y: e.clientY };
+    }
+  }
+  drag.active = false;
+});
+canvas.addEventListener('mouseleave', () => { drag.active = false; hideTip(); });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  cam.ts = Math.max(0.15, Math.min(4, cam.ts * factor));
+}, { passive: false });
+
+// Touch
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    drag.active = true;
+    drag.last = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    pinch = { dist: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY) };
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && drag.active) {
+    const dx = e.touches[0].clientX - drag.last.x;
+    const dy = e.touches[0].clientY - drag.last.y;
+    cam.tx += dx / cam.scale;
+    cam.ty += dy / cam.scale;
+    drag.last = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2 && pinch) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    cam.ts = Math.max(0.15, Math.min(4, cam.ts * (d / pinch.dist)));
+    pinch.dist = d;
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', () => { drag.active = false; pinch = null; });
+
+// Gamepad (PS5 carry-over)
+let gp = null;
+window.addEventListener('gamepadconnected', e => { gp = e.gamepad; });
+window.addEventListener('gamepaddisconnected', () => { gp = null; });
+function pollGamepad() {
+  if (!gp) return;
+  const g = navigator.getGamepads()[gp.index];
+  if (!g) return;
+  const btn = i => g.buttons[i]?.pressed;
+  const lx = Math.abs(g.axes[0]) > 0.12 ? g.axes[0] : 0;
+  const ly = Math.abs(g.axes[1]) > 0.12 ? g.axes[1] : 0;
+  const rz = Math.abs(g.axes[3]) > 0.12 ? g.axes[3] : 0;
+
+  if (sidebarProjectKey) {
+    // Sidebar open: L1/R1 = cycle tabs, left stick Y = scroll items, right stick = zoom
+    if (btn(4) && !gpPrevBtns[4]) cycleSidebarTab(-1);
+    if (btn(5) && !gpPrevBtns[5]) cycleSidebarTab(1);
+    if (ly) {
+      sbScrollAcc += ly * 0.18;
+      if (Math.abs(sbScrollAcc) >= 1) {
+        sbSelectItem(Math.round(sbScrollAcc));
+        sbScrollAcc = 0;
+      }
+    }
+    // X = open selected agent detail
+    if (btn(0) && !gpPrevBtns[0]) {
+      const proj = projects[sidebarProjectKey];
+      if (sidebarTab === 'agents' && proj) {
+        const agent = proj.agents[sidebarSelectedIdx];
+        if (agent) openDetail(agent);
+      }
+    }
+  } else {
+    // Default: camera pan + project cycle
+    if (lx || ly) { cam.tx -= lx * 8 / cam.scale; cam.ty -= ly * 8 / cam.scale; }
+    if (btn(5) && !gpPrevBtns[5]) gpCycleProject(1);
+    if (btn(4) && !gpPrevBtns[4]) gpCycleProject(-1);
+    // X = open sidebar for focused/nearest project
+    if (btn(0) && !gpPrevBtns[0]) {
+      const key = focusedProjectKey || activeProjectKey;
+      if (key) openSidebar(key);
+    }
+  }
+
+  // Right stick zoom always works
+  if (rz) cam.ts = Math.max(0.15, Math.min(4, cam.ts * (1 - rz * 0.04)));
+  // Circle = close sidebar/detail
+  if (btn(1) && !gpPrevBtns[1]) {
+    if (sidebarProjectKey) closeSidebar();
+    else closeDetail();
+  }
+  [0, 1, 4, 5].forEach(i => { gpPrevBtns[i] = btn(i); });
+}
+
+// ---- Tooltip ----
+function showTip(agent, cx, cy) {
+  const tip = document.getElementById('tip');
+  document.getElementById('tipName').textContent = agent.display_name || agent.name;
+  document.getElementById('tipRole').textContent = (agent.role || 'worker').toUpperCase();
+  const statusEl = document.getElementById('tipStatus');
+  statusEl.textContent = agent.status;
+  statusEl.className = 't-' + agent.status;
+  const ctx_data = contextCache[agent.id];
+  document.getElementById('tipCtx').textContent = ctx_data ? ctx_data.percent + '%' : '—';
+  document.getElementById('tipUnread').textContent = agent.unread_count || 0;
+  document.getElementById('tipLast').textContent = relTime(agent.last_activity);
+  document.getElementById('tipProject').textContent = projectKey(agent.cwd, agent.role);
+  const tx = cx + 16, ty = Math.min(cy - 10, H - 180);
+  tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
+  tip.style.display = 'block';
+}
+function hideTip() { document.getElementById('tip').style.display = 'none'; }
+
+// ---- Cluster sidebar ----
+const sidebarEl = document.getElementById('sidebar');
+const sbTabs = ['agents', 'files'];
+const sbTabLabels = { agents: 'AGENTS', files: 'FILES' };
+let sidebarProjectKey = null;
+let sidebarTab = 'agents';
+let sidebarSelectedIdx = 0;
+let sbScrollAcc = 0;
+
+document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+
+function openSidebar(key) {
+  sidebarProjectKey = key;
+  sidebarTab = 'agents';
+  sidebarSelectedIdx = 0;
+  setFocusProject(key);
+  renderSidebarTabs();
+  renderSidebarBody();
+  sidebarEl.classList.add('open');
+  hideTip();
+  // Pre-fetch files live from /api/browse
+  const proj = projects[key];
+  if (proj && proj.cwdBase) {
+    getProjectFiles(key, proj.cwdBase).then(() => {
+      if (sidebarProjectKey === key && sidebarTab === 'files') renderSidebarBody();
+    });
+  }
+}
+
+function closeSidebar() {
+  sidebarEl.classList.remove('open');
+  sidebarProjectKey = null;
+  clearFocus();
+}
+
+function cycleSidebarTab(dir) {
+  const idx = sbTabs.indexOf(sidebarTab);
+  sidebarTab = sbTabs[(idx + dir + sbTabs.length) % sbTabs.length];
+  sidebarSelectedIdx = 0;
+  renderSidebarTabs();
+  renderSidebarBody();
+}
+
+function renderSidebarTabs() {
+  const container = document.getElementById('sbTabs');
+  container.innerHTML = '';
+  sbTabs.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'sb-tab' + (t === sidebarTab ? ' active' : '');
+    el.textContent = sbTabLabels[t];
+    el.addEventListener('click', () => {
+      sidebarTab = t; sidebarSelectedIdx = 0;
+      renderSidebarTabs(); renderSidebarBody();
+    });
+    container.appendChild(el);
+  });
+}
+
+async function getProjectFiles(key, cwdBase) {
+  // Try cache first
+  if (browserCache[cwdBase]) {
+    return browserCache[cwdBase];
+  }
+  console.log('[files] fetching', key, cwdBase);
+  try {
+    const res = await fetch(SUTRA + `/api/browse?path=${encodeURIComponent(cwdBase)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = (data.items || []).filter(i => i.name !== '..');
+    // Convert to {name, kind, path} format, limit to 14
+    const files = items.slice(0, 14).map(item => ({
+      name: item.name,
+      kind: item.is_dir ? 'folder' : 'file',
+      path: item.path
+    }));
+    console.log('[files] got', files.length, 'items for', key, files.map(f=>f.name));
+    browserCache[cwdBase] = files;
+    return files;
+  } catch(e) {
+    console.error('browse failed:', e);
+    return [];
+  }
+}
+
+function renderSidebarBody() {
+  const proj = projects[sidebarProjectKey];
+  const body = document.getElementById('sidebar-body');
+  document.getElementById('sb-cluster-name').textContent =
+    proj ? proj.name.toUpperCase() : '—';
+  body.innerHTML = '';
+
+  if (!proj) return;
+
+  if (sidebarTab === 'agents') {
+    if (!proj.agents.length) {
+      body.innerHTML = '<div class="sb-hint">no agents in this cluster</div>';
+      return;
+    }
+    proj.agents.forEach((agent, i) => {
+      const isBusy = agent.status === 'busy';
+      const isOffline = agent.status === 'offline';
+      const dotColor = isBusy ? '#4fffb0' : isOffline ? '#2e3547' : '#4a8fff';
+      const task = deriveTask(agent);
+      const fname = targetFileName(agent);
+
+      const item = document.createElement('div');
+      item.className = 'sb-item' + (i === sidebarSelectedIdx ? ' selected' : '');
+      item.innerHTML = `
+        <div class="sb-item-dot" style="background:${dotColor}"></div>
+        <div class="sb-item-body">
+          <div class="sb-item-name">${agent.display_name || agent.name}</div>
+          <div class="sb-item-sub">${task || agent.status}</div>
+          ${fname ? `<div class="sb-item-sub" style="color:rgba(160,185,220,0.5)">→ ${fname}</div>` : ''}
+        </div>
+        <div class="sb-item-kind">${agent.status}</div>
+      `;
+      item.addEventListener('click', () => {
+        sidebarSelectedIdx = i;
+        renderSidebarBody();
+        openDetail(agent);
+      });
+      body.appendChild(item);
+    });
+    body.innerHTML += '<div class="sb-hint">X · select agent&nbsp;&nbsp;L1/R1 · switch tab</div>';
+  }
+
+  if (sidebarTab === 'files') {
+    console.log('[files-render] cwdBase=', proj.cwdBase, 'cached=', !!browserCache[proj.cwdBase]);
+    // Use live files from /api/browse if available, fallback to constellation nodes
+    const liveFiles = proj.cwdBase ? (browserCache[proj.cwdBase] || null) : null;
+    const files = liveFiles || (proj.fileNodes ? proj.fileNodes.map(n => ({name: n.label, kind: n.kind, path: proj.cwdBase + '/' + n.label})) : []);
+
+    if (!files.length) {
+      body.innerHTML = liveFiles === null ? '<div class="sb-hint">loading files…</div>' : '<div class="sb-hint">no files</div>';
+      return;
+    }
+    files.forEach((file, i) => {
+      const item = document.createElement('div');
+      item.className = 'sb-item' + (i === sidebarSelectedIdx ? ' selected' : '');
+      const kHue = KIND_HUE[file.kind] || 260;
+      item.innerHTML = `
+        <div class="sb-item-dot" style="background:hsla(${kHue},55%,65%,0.8)"></div>
+        <div class="sb-item-body">
+          <div class="sb-item-name">${file.name}</div>
+        </div>
+        <div class="sb-item-kind">${file.kind}</div>
+      `;
+      item.addEventListener('click', () => {
+        console.log('[file-click]', file);
+        sidebarSelectedIdx = i;
+        renderSidebarBody();
+        if (file.kind !== 'folder') openFileModal(file.path || proj.cwdBase + '/' + file.name);
+      });
+      body.appendChild(item);
+    });
+    body.innerHTML += '<div class="sb-hint">L1/R1 · switch tab</div>';
+  }
+}
+
+function sbSelectItem(delta) {
+  const proj = projects[sidebarProjectKey];
+  if (!proj) return;
+  const list = sidebarTab === 'agents' ? proj.agents : (proj.fileNodes || []);
+  sidebarSelectedIdx = Math.max(0, Math.min(list.length - 1, sidebarSelectedIdx + delta));
+  renderSidebarBody();
+  // Scroll selected item into view
+  const items = document.querySelectorAll('#sidebar-body .sb-item');
+  if (items[sidebarSelectedIdx]) items[sidebarSelectedIdx].scrollIntoView({ block: 'nearest' });
+}
+
+// ---- Detail panel ----
+let detailAgent = null;
+let detailRecent = null;
+
+// Cache for live file browsing
+let browserCache = {}; // path → { files: [{name, kind, path}] }
+const detailEl = document.getElementById('detail');
+document.getElementById('detail-close').addEventListener('click', closeDetail);
+
+function openDetail(agent) {
+  detailAgent = agent;
+  renderDetail(agent);
+  detailEl.classList.add('open');
+  hideTip();
+  focusedProjectKey = projectKey(agent.cwd, agent.role);
+  focusProject(focusedProjectKey);
+  // Fetch recent messages
+  fetchRecentMessages(agent.id);
+}
+
+function closeDetail() {
+  detailEl.classList.remove('open');
+  detailAgent = null;
+  clearFocus();
+}
+
+function renderDetail(agent) {
+  const ctxd = contextCache[agent.id];
+  const task = deriveTask(agent);
+  const fname = targetFileName(agent);
+
+  // Find current file node (where agent is closest to)
+  let atNode = null;
+  for (const proj of Object.values(projects)) {
+    if (!proj.agents.includes(agent)) continue;
+    if (proj.fileNodes) {
+      let best = null, bestD = Infinity;
+      proj.fileNodes.forEach(n => {
+        const d = Math.hypot(n.x - (agent._x || 0), n.y - (agent._y || 0));
+        if (d < bestD) { bestD = d; best = n; }
+      });
+      atNode = best;
+    }
+    break;
+  }
+
+  document.getElementById('detailName').textContent = agent.display_name || agent.name;
+  document.getElementById('detailRole').textContent = (agent.role || 'worker').toUpperCase();
+  document.getElementById('detailTask').textContent = task || '—';
+
+  // Session info
+  const sessId = agent.session_id || '—';
+  document.getElementById('detailSessionId').textContent = sessId.slice(0, 8);
+  document.getElementById('detailLast').textContent = relTime(agent.last_activity);
+
+  const statusEl = document.getElementById('detailStatus');
+  const dotColor = agent.status === 'busy' ? '#4fffb0' : agent.status === 'online' ? '#4a8fff' : '#2e3547';
+  statusEl.innerHTML = `<span class="d-status-dot" style="background:${dotColor}"></span>${agent.status}`;
+
+  document.getElementById('detailProject').textContent = projectKey(agent.cwd, agent.role);
+  document.getElementById('detailUnread').textContent = agent.unread_count || 0;
+  document.getElementById('detailAt').textContent = atNode ? atNode.label : '—';
+  document.getElementById('detailGoingTo').textContent = fname || '—';
+
+  if (ctxd) {
+    const pct = ctxd.percent;
+    document.getElementById('detailCtxPct').textContent = pct + '%';
+    const fill = document.getElementById('detailCtxBar');
+    fill.style.width = pct + '%';
+    fill.style.background = pct > 80 ? '#ff4444' : pct > 60 ? '#ffaa44' : '#4a8fff';
+  } else {
+    document.getElementById('detailCtxPct').textContent = '—';
+    document.getElementById('detailCtxBar').style.width = '0%';
+  }
+}
+
+async function fetchRecentMessages(agentId) {
+  try {
+    const res = await fetch(SUTRA + '/api/agents/' + agentId + '/recent?n=5');
+    if (!res.ok) return;
+    detailRecent = await res.json();
+    renderDetailMessages();
+  } catch (_) {}
+}
+
+function renderDetailMessages() {
+  const container = document.getElementById('detailMessages');
+  if (!detailRecent || !detailRecent.recent_messages || !detailRecent.recent_messages.length) {
+    container.innerHTML = '<div style="color:var(--ink-3)">—</div>';
+    return;
+  }
+  const msgs = detailRecent.recent_messages;
+  let html = '';
+  msgs.forEach(m => {
+    const isUser = m.role === 'user';
+    const text = (m.content || '').slice(0, 80);
+    const col = isUser ? 'rgba(160,185,220,0.6)' : 'rgba(150,200,100,0.5)';
+    html += `<div style="margin-bottom:5px;color:${col}">${isUser ? '→' : '←'} ${text}${text.length > 75 ? '...' : ''}</div>`;
+  });
+  container.innerHTML = html;
+}
+
+// Re-render detail if open (keep it fresh on polls)
+function refreshDetailIfOpen() {
+  if (detailAgent) {
+    const updated = agentList.find(a => a.id === detailAgent.id);
+    if (updated) { detailAgent = updated; renderDetail(updated); }
+  }
+}
+
+// ---- Loop ----
+function loop() {
+  pollGamepad();
+  lerpCam();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- Agent drift: bezier easing between file nodes (like 20-tree) ----
+function tickAgents() {
+  Object.values(projects).forEach(proj => {
+    const fileNodes = proj.fileNodes || [];
+    if (!fileNodes.length) return;
+    proj.agents.forEach(agent => {
+      const agentProjKey = projectKey(agent.cwd, agent.role);
+      const isCentral = agent.role === 'orchestrator' || agentProjKey === 'sutra';
+      const recentlyActive = agent.last_activity &&
+        (Date.now() - new Date(agent.last_activity).getTime()) < 15 * 60 * 1000;
+      if (agent.status === 'offline' || (agent.status !== 'busy' && !isCentral && !recentlyActive)) {
+        return;
+      }
+      // Init drift state
+      if (agent._driftT === undefined) {
+        agent._driftT = Math.random();
+        agent._driftSpeed = 0.003 + Math.random() * 0.003;
+        const initOrbitAng = Math.random() * Math.PI * 2;
+        const initOrbitR = 28 + Math.random() * 12;
+        agent._driftPrev = agent._nx + Math.cos(initOrbitAng) * initOrbitR;
+        agent._driftPrevY = agent._ny + Math.sin(initOrbitAng) * initOrbitR;
+        agent._driftTarget = agent._driftPrev;
+        agent._driftTargetY = agent._driftPrevY;
+        agent._hoverLerp = 0;
+      }
+      // Ease hover state: 1 = fully paused, 0 = fully moving
+      if (agent._hoverLerp === undefined) agent._hoverLerp = 0;
+      const isHovering = hoverAgent && hoverAgent.id === agent.id;
+      const hoverTarget = isHovering ? 1 : 0;
+      agent._hoverLerp += (hoverTarget - agent._hoverLerp) * 0.12;
+
+      // Apply hover lerp to speed multiplier
+      const speedMult = (agent.status === 'busy' ? 1.4 : 0.8) * (1 - agent._hoverLerp);
+      agent._driftT += agent._driftSpeed * speedMult;
+      if (agent._driftT >= 1) {
+        // Dwell near current node before moving on
+        if (agent._dwellT === undefined) {
+          agent._dwellT = 90 + Math.random() * 150; // 1.5–4s at 60fps
+        }
+        agent._dwellT--;
+        if (agent._dwellT > 0) return;
+        agent._dwellT = undefined;
+
+        // Pick next file node (avoid current target, weight toward non-core for busy)
+        const current = agent._targetFile;
+        const pool = fileNodes.filter(n => n.id !== current && (agent.status === 'busy' ? !n.isCore : true));
+        const next = pool.length ? pool[Math.floor(Math.random() * pool.length)] : fileNodes[0];
+        agent._driftPrev = agent._x;
+        agent._driftPrevY = agent._y;
+        // Orbit around the node (not on top) to avoid label overlap
+        const orbitR = 24;
+        const orbitAng = Math.random() * Math.PI * 2;
+        agent._driftTarget = next.x + Math.cos(orbitAng) * orbitR;
+        agent._driftTargetY = next.y + Math.sin(orbitAng) * orbitR;
+        agent._targetFile = next.id;
+        agent._driftT = 0;
+      }
+      // Bezier ease
+      const et = agent._driftT * agent._driftT * (3 - 2 * agent._driftT);
+      agent._x = agent._driftPrev + (agent._driftTarget - agent._driftPrev) * et;
+      agent._y = agent._driftPrevY + (agent._driftTargetY - agent._driftPrevY) * et;
+    });
+  });
+}
+setInterval(tickAgents, 1000 / 60);
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  // Alt+Left/Right: cycle projects (if sidebar closed) or cycle sidebar tabs
+  if (e.altKey && e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (sidebarProjectKey) cycleSidebarTab(-1);
+    else gpCycleProject(-1);
+  }
+  if (e.altKey && e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (sidebarProjectKey) cycleSidebarTab(1);
+    else gpCycleProject(1);
+  }
+  // Alt+Up/Down: scroll sidebar items
+  if (e.altKey && e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (sidebarProjectKey) sbSelectItem(-1);
+  }
+  if (e.altKey && e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (sidebarProjectKey) sbSelectItem(1);
+  }
+  // Plain arrow keys: snap to prev/next cluster
+  if (!e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    gpCycleProject(-1);
+  }
+  if (!e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    gpCycleProject(1);
+  }
+  // Enter: open sidebar for focused cluster, or select agent in sidebar
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (sidebarProjectKey && sidebarTab === 'agents') {
+      const proj = projects[sidebarProjectKey];
+      if (proj && proj.agents[sidebarSelectedIdx]) {
+        openDetail(proj.agents[sidebarSelectedIdx]);
+      }
+    } else if (!sidebarProjectKey && focusedProjectKey) {
+      openSidebar(focusedProjectKey);
+    }
+  }
+  // Escape: close sidebar/detail/focus
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeSidebar(); closeDetail(); clearFocus();
+  }
+});
+
+// ---- Bootstrap ----
+console.log('[21-sutra-map] BUILD v2 — file modal active');
+buildStars();
+window.addEventListener('resize', () => { resize(); buildStars(); });
+fetchAgents();
+setInterval(fetchAgents, POLL_MS);
+loop();
+</script>
+
+<!-- File viewer modal -->
+<dialog id="fileModal" style="
+  background:#12131a; color:#c8cad8; border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px; padding:0; max-width:min(860px,90vw); width:100%;
+  max-height:80vh; display:flex; flex-direction:column; outline:none;
+">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0">
+    <span id="fileModalName" style="font-size:12px;font-family:monospace;color:#9fa3b8;"></span>
+    <button onclick="document.getElementById('fileModal').close()" style="background:none;border:none;color:#9fa3b8;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;">&times;</button>
+  </div>
+  <div id="fileModalBody" style="overflow-y:auto;padding:20px 24px;flex:1;font-size:13px;line-height:1.7;"></div>
+</dialog>
+
+<style>
+#fileModal::backdrop { background: rgba(0,0,0,0.6); }
+#fileModalBody h1,#fileModalBody h2,#fileModalBody h3 { color:#e7e9f2; margin:1.2em 0 0.4em; }
+#fileModalBody h1 { font-size:18px; } #fileModalBody h2 { font-size:15px; } #fileModalBody h3 { font-size:13px; }
+#fileModalBody p { margin:0.5em 0; color:#c8cad8; }
+#fileModalBody code { background:rgba(255,255,255,0.07); padding:1px 5px; border-radius:3px; font-family:monospace; font-size:12px; }
+#fileModalBody pre { background:rgba(255,255,255,0.05); padding:12px; border-radius:6px; overflow-x:auto; }
+#fileModalBody pre code { background:none; padding:0; }
+#fileModalBody a { color:#7eb8f7; }
+#fileModalBody table { border-collapse:collapse; width:100%; font-size:12px; }
+#fileModalBody th,#fileModalBody td { border:1px solid rgba(255,255,255,0.1); padding:6px 10px; }
+#fileModalBody th { background:rgba(255,255,255,0.05); }
+#fileModalBody ul,#fileModalBody ol { padding-left:1.4em; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+async function openFileModal(filePath) {
+  const modal = document.getElementById('fileModal');
+  const body = document.getElementById('fileModalBody');
+  const nameEl = document.getElementById('fileModalName');
+  const name = filePath.split('/').pop();
+  nameEl.textContent = name;
+  body.innerHTML = '<div style="color:#666;padding:20px 0">Loading…</div>';
+  modal.showModal();
+  try {
+    const res = await fetch('http://localhost:8900/api/file?path=' + encodeURIComponent(filePath));
+    if (!res.ok) { body.innerHTML = `<div style="color:#f87171">Error ${res.status}</div>`; return; }
+    const data = await res.json();
+    const isMarkdown = /\.(md|markdown)$/i.test(name);
+    if (isMarkdown && typeof marked !== 'undefined') {
+      body.innerHTML = marked.parse(data.content);
+    } else {
+      body.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-word">${data.content.replace(/</g,'&lt;')}</pre>`;
+    }
+  } catch(e) {
+    body.innerHTML = `<div style="color:#f87171">${e.message}</div>`;
+  }
+}
+document.getElementById('fileModal').addEventListener('keydown', e => {
+  if (e.key === 'Escape') e.target.close();
+});
+</script>
+</body>
+</html>

@@ -14,7 +14,7 @@ export function hashStr(s) {
 export function projectKey(cwd, role) {
   if (role === 'orchestrator') return 'sutra';
   if (!cwd) return 'sutra';
-  const baseRe = new RegExp('^' + (window.SUTRA_PROJECT_ROOT || '').replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&') + '/?');
+  const baseRe = /^\/Users\/christopherk\.marks\/Downloads\/personal-os-main\/?/;
   const rel = cwd.replace(baseRe, '');
   if (!rel) return 'sutra';
   const parts = rel.split('/').filter(Boolean);
@@ -25,7 +25,7 @@ export function projectKey(cwd, role) {
   return parts[0] || 'sutra';
 }
 
-// Titlecase project key ("cpa" → "Cpa", "AI_research" → "Ai Research")
+// Titlecase project key ("lovenotes" → "Lovenotes", "AI_research" → "Ai Research")
 export function projectLabel(key) {
   return key.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
