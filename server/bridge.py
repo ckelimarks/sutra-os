@@ -4,9 +4,17 @@ Bridge Server for Agent Chat.
 HTTP server handling agent management, chat messages, and reports.
 """
 
+import sys
+if sys.version_info < (3, 10):
+    sys.stderr.write(
+        f"Sutra requires Python 3.10 or newer (you have {sys.version.split()[0]}).\n"
+        f"Stock macOS python3 is 3.9. Install a newer interpreter (brew install "
+        f"python@3.12) and re-run, or set SUTRA_PYTHON in .env.\n"
+    )
+    sys.exit(1)
+
 import json
 import os
-import sys
 import time
 import threading
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -1541,14 +1549,15 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 self.send_error_json(f"Missing required fields: {required}")
                 return
 
-            # HARD BOUNDARY: all agent cwds must live under personal-os-main
+            # HARD BOUNDARY: all agent cwds must live under SUTRA_PROJECT_ROOT.
             PROJECT_ROOT = os.environ.get("SUTRA_PROJECT_ROOT", str(Path.home() / "sutra-project"))
             requested_cwd = str(data['cwd']).rstrip('/')
             if not requested_cwd.startswith(PROJECT_ROOT):
                 self.send_error_json(
-                    f"cwd must be inside {PROJECT_ROOT}. "
+                    f"cwd must be inside SUTRA_PROJECT_ROOT ({PROJECT_ROOT}). "
                     f"Got: {requested_cwd}. "
-                    f"For external projects, create a workspace under Projects/prototypes/ instead.",
+                    f"Either move the directory under that root, or set SUTRA_PROJECT_ROOT in .env "
+                    f"to a path that contains it.",
                     status=400
                 )
                 return
@@ -1568,6 +1577,23 @@ class AgentChatHandler(BaseHTTPRequestHandler):
             else:
                 model = 'sonnet'
 
+            # Auto-apply the orchestrator system prompt for the canonical
+            # Sutra agent (or anything created with role="orchestrator")
+            # unless the caller passed an explicit system_prompt.
+            system_prompt = data.get('system_prompt')
+            role = data.get('role', 'worker')
+            is_orchestrator = (data['name'] == 'Sutra') or (role == 'orchestrator')
+            if is_orchestrator and not system_prompt:
+                template_path = Path(__file__).parent.parent / "templates" / "sutra-orchestrator.md"
+                if template_path.exists():
+                    try:
+                        full = template_path.read_text()
+                        # Skip the header block (everything before the first '---' divider)
+                        parts = full.split('\n---\n', 1)
+                        system_prompt = parts[1].strip() if len(parts) == 2 else full
+                    except Exception as e:
+                        logger.warning(f"Could not load orchestrator template: {e}")
+
             agent = db.create_agent(
                 name=data['name'],
                 cwd=validated_cwd,
@@ -1575,8 +1601,8 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                 emoji=data.get('emoji', '🤖'),
                 model=model,
                 provider=provider,
-                system_prompt=data.get('system_prompt'),
-                role=data.get('role', 'worker')
+                system_prompt=system_prompt,
+                role=role,
             )
 
             # Initialize git-backed workspace (REQ-2.1)
@@ -1589,30 +1615,50 @@ class AgentChatHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.warning(f"Workspace init failed for {data['name']}: {e}")
 
-            # Try to recover a previous session for this agent
-            try:
-                recovered = session_manager.recover_agent_session(data['name'], data['cwd'])
-                if recovered and agent.get('thread_id'):
-                    session_id = recovered.get('session_id')
-                    # Verify the session file actually exists before linking
-                    session_file = recovered.get('file_path') or recovered.get('session_file')
-                    if session_file and Path(session_file).exists():
-                        db.update_thread_session(agent['thread_id'], session_id)
-                        session_manager.register_session(
-                            session_id=session_id,
-                            agent_id=agent['id'],
-                            agent_name=agent['name'],
-                            cwd=data['cwd'],
-                            model=data.get('model', 'sonnet'),
-                            session_file=session_file
+            # Session recovery is OPT-IN. By default, a new agent starts fresh
+            # — even if there's an existing Claude JSONL on disk for this cwd
+            # (e.g. the user runs `claude` directly there in another terminal),
+            # we don't auto-attach to it. Set `recover_session: true` in the
+            # request body to opt in.
+            recovered_meta = None
+            if data.get('recover_session'):
+                try:
+                    recovered = session_manager.recover_agent_session(data['name'], data['cwd'])
+                    if recovered and agent.get('thread_id'):
+                        session_id = recovered.get('session_id')
+                        session_file = recovered.get('file_path') or recovered.get('session_file')
+                        if session_file and Path(session_file).exists():
+                            db.update_thread_session(agent['thread_id'], session_id)
+                            session_manager.register_session(
+                                session_id=session_id,
+                                agent_id=agent['id'],
+                                agent_name=agent['name'],
+                                cwd=data['cwd'],
+                                model=data.get('model', 'sonnet'),
+                                session_file=session_file
+                            )
+                            agent['session_id'] = session_id
+                            agent['_recovered_session'] = True
+                            recovered_meta = {'session_id': session_id, 'session_file': session_file}
+                            logger.info(f"Recovered session {session_id[:8]}... for recreated agent {data['name']}")
+                        else:
+                            logger.warning(f"Session recovery for {data['name']}: file not found, starting fresh")
+                except Exception as e:
+                    logger.warning(f"Session recovery failed for {data['name']}: {e}")
+            else:
+                # Surface a heads-up if there IS a recoverable session, so the
+                # user can re-create with recover_session=true if they wanted it.
+                try:
+                    candidate = session_manager.recover_agent_session(data['name'], data['cwd'])
+                    if candidate and candidate.get('session_id'):
+                        agent['_recoverable_session_available'] = candidate['session_id']
+                        logger.info(
+                            f"Existing session detected for {data['name']} at {data['cwd']} "
+                            f"({candidate['session_id'][:8]}...) — not attached "
+                            f"(pass recover_session=true to opt in)"
                         )
-                        agent['session_id'] = session_id
-                        agent['_recovered_session'] = True
-                        logger.info(f"Recovered session {session_id[:8]}... for recreated agent {data['name']}")
-                    else:
-                        logger.warning(f"Session recovery for {data['name']}: file not found, starting fresh")
-            except Exception as e:
-                logger.warning(f"Session recovery failed for {data['name']}: {e}")
+                except Exception:
+                    pass
 
             # Broadcast agent_created so any connected UI can add the lane immediately
             signal_agent_created(agent['id'], agent['name'])
@@ -2110,8 +2156,13 @@ class AgentChatHandler(BaseHTTPRequestHandler):
                                 extra={'old_session_id': old_session_id},
                             )
 
+                            # Use the SAME interpreter that's running Sutra so
+                            # the child gets a Python ≥ 3.10 (Continuum's
+                            # spoof_tool uses PEP 604 union types). Stock
+                            # macOS `python3` is 3.9 → would fail to import.
+                            spoof_python = os.environ.get('SUTRA_PYTHON') or sys.executable
                             proc = sp_reset.Popen(
-                                ['python3', f'{continuum_dir}/spoof_tool.py',
+                                [spoof_python, f'{continuum_dir}/spoof_tool.py',
                                  '--compress',
                                  '--session', old_session_id,
                                  '--prompt', spoof_prompt],
